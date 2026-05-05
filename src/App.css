@@ -1,0 +1,104 @@
+import { useState, useEffect } from 'react'
+import { supabase } from './supabase'
+import Auth from './Auth'
+import CreateProfile from './CreateProfile'
+
+export default function App() {
+  var [session, setSession] = useState(null)
+  var [player, setPlayer] = useState(null)
+  var [loading, setLoading] = useState(true)
+
+  useEffect(function() {
+    supabase.auth.getSession().then(function(result) {
+      setSession(result.data.session)
+      if (result.data.session) {
+        loadPlayer(result.data.session.user.id)
+      } else {
+        setLoading(false)
+      }
+    })
+    var listener = supabase.auth.onAuthStateChange(function(event, sess) {
+      setSession(sess)
+      if (sess) {
+        loadPlayer(sess.user.id)
+      } else {
+        setPlayer(null)
+        setLoading(false)
+      }
+    })
+    return function() {
+      listener.data.subscription.unsubscribe()
+    }
+  }, [])
+
+  async function loadPlayer(userId) {
+    setLoading(true)
+    var { data } = await supabase
+      .from('players')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    setPlayer(data || null)
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight:'100vh', background:'#0e0e16', display:'flex',
+        alignItems:'center', justifyContent:'center',
+        fontFamily:'Plus Jakarta Sans,sans-serif',
+        color:'#a855f7', fontSize:18, fontWeight:700, letterSpacing:2
+      }}>
+        ⚡ PADELLINK...
+      </div>
+    )
+  }
+
+  if (!session) return <Auth />
+
+  if (!player) {
+    return (
+      <CreateProfile
+        session={session}
+        onCreated={() => loadPlayer(session.user.id)}
+      />
+    )
+  }
+
+  return (
+    <div style={{
+      minHeight:'100vh', background:'#0e0e16', display:'flex',
+      alignItems:'center', justifyContent:'center',
+      fontFamily:'Plus Jakarta Sans,sans-serif', color:'#fff',
+      flexDirection:'column', gap:16
+    }}>
+      <div style={{
+        fontFamily:'Bebas Neue,cursive', fontSize:36, letterSpacing:3,
+        background:'linear-gradient(135deg,#a855f7,#06b6d4)',
+        WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent'
+      }}>
+        PadelLink
+      </div>
+      <div style={{ fontSize:14, color:'#10b981' }}>
+        ✅ {player.name} — {player.city} — Niveau {player.level}
+      </div>
+      <div style={{ fontSize:13, color:'#a855f7' }}>
+        {player.points} pts · {player.wins} victoires · {player.matches} matchs
+      </div>
+      <button
+        onClick={() => supabase.auth.signOut()}
+        style={{
+          marginTop:8, padding:'10px 20px',
+          background:'rgba(239,68,68,0.15)',
+          border:'1px solid rgba(239,68,68,0.3)',
+          color:'#ef4444', borderRadius:10, cursor:'pointer',
+          fontFamily:'Plus Jakarta Sans,sans-serif',
+          fontWeight:600, fontSize:13
+        }}
+      >
+        Se déconnecter
+      </button>
+    </div>
+  )
+}
