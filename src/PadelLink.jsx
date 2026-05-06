@@ -925,12 +925,26 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
     })
   }
 
-  var ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
-  var t1names = sel.slice(0, 2).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-  var t2names = sel.slice(2, 4).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  function makeBalancedTeams() {
+    var pool = [me, ...followedPlayers].slice(0, 4)
+    if (pool.length < 4) return
+    var combos = [[0,1,2,3],[0,2,1,3],[0,3,1,2]]
+    var best = null, bestDiff = 999
+    combos.forEach(function(c) {
+      var t1 = pool[c[0]].level + pool[c[1]].level
+      var t2 = pool[c[2]].level + pool[c[3]].level
+      var diff = Math.abs(t1 - t2)
+      if (diff < bestDiff) { bestDiff = diff; best = [pool[c[0]].id, pool[c[1]].id, pool[c[2]].id, pool[c[3]].id] }
+    })
+    if (best) setSel(best)
+  }
 
-  // Only me + followed players selectable
+  var ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
   var allSelectable = [me, ...followedPlayers]
+  var t1names = sel.slice(0, 2).map(id => allSelectable.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  var t2names = sel.slice(2, 4).map(id => allSelectable.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  var t1level = sel.slice(0,2).reduce((acc,id) => { var p=allSelectable.find(x=>x.id===id); return acc+(p?p.level:0) }, 0)
+  var t2level = sel.slice(2,4).reduce((acc,id) => { var p=allSelectable.find(x=>x.id===id); return acc+(p?p.level:0) }, 0)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -939,27 +953,60 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
 
         {step === 1 && (
           <div>
-            <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 8 }}>{t.chooseTeams}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4 · Seulement tes joueurs suivis</div>
-            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700 }}>{t.chooseTeams}</div>
+              <button style={{ background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }} onClick={makeBalancedTeams}>
+                ⚖️ {lang === 'fr' ? 'Équilibrer' : 'Balance'}
+              </button>
+            </div>
+
+            {sel.length === 4 && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div style={{ flex: 1, background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.2)', borderRadius: 10, padding: '6px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#06b6d4', fontWeight: 700, marginBottom: 2 }}>🔵 Éq.1</div>
+                  <div style={{ fontSize: 11, color: '#e2e8f0' }}>{t1names}</div>
+                  <div style={{ fontSize: 10, color: '#6b7280' }}>Niv. {t1level.toFixed(1)}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', fontSize: 16 }}>
+                  {Math.abs(t1level - t2level) <= 1 ? '⚖️' : '⚠️'}
+                </div>
+                <div style={{ flex: 1, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 10, padding: '6px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#a855f7', fontWeight: 700, marginBottom: 2 }}>🟣 Éq.2</div>
+                  <div style={{ fontSize: 11, color: '#e2e8f0' }}>{t2names}</div>
+                  <div style={{ fontSize: 10, color: '#6b7280' }}>Niv. {t2level.toFixed(1)}</div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
               {allSelectable.map(p => {
                 var isSel = sel.includes(p.id)
                 var isMe = p.id === me.id
                 var idx = sel.indexOf(p.id)
-                var teamTag = idx === 0 || idx === 1 ? '🔵 Éq.1' : idx === 2 || idx === 3 ? '🟣 Éq.2' : ''
-                var isFollowed = followedPlayers.some(fp => fp.id === p.id)
+                var info = getLevelInfo(p.level)
+                var lbl = lang === 'en' ? info.labelEn : info.label
+                var teamColor = idx === 0 || idx === 1 ? '#06b6d4' : idx === 2 || idx === 3 ? '#a855f7' : null
+                var teamLabel = idx === 0 || idx === 1 ? 'Éq.1' : idx === 2 || idx === 3 ? 'Éq.2' : null
                 return (
-                  <div key={p.id} className="row" style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: isMe ? 'default' : 'pointer', opacity: isMe ? 0.5 : 1 }}
-                    onClick={isMe ? null : () => toggleSel(p.id)}>
-                    <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid ' + (isSel ? '#7c3aed' : '#374151'), background: isSel ? '#7c3aed' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{isSel ? '✓' : ''}</div>
-                    <Av size={32} photo={p.photo_url} name={p.name} />
-                    <span style={{ fontSize: 13, flex: 1 }}>{p.name}{isMe ? ' (moi)' : ''}</span>
-                    {isSel && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700 }}>{teamTag}</span>}
+                  <div key={p.id} onClick={isMe ? null : () => toggleSel(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, cursor: isMe ? 'default' : 'pointer', border: '2px solid ' + (isSel ? (teamColor || '#7c3aed') : 'rgba(255,255,255,0.07)'), background: isSel ? ((teamColor || '#7c3aed') + '15') : 'rgba(255,255,255,0.03)', opacity: isMe ? 0.6 : 1, transition: 'all 0.15s' }}>
+                    <Av size={38} photo={p.photo_url} name={p.name} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{p.name}{isMe ? ' (moi)' : ''}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: info.color, background: info.color + '22', padding: '1px 6px', borderRadius: 10 }}>{lbl}</span>
+                        <span style={{ fontSize: 10, color: '#6b7280' }}>Niv. {p.level}</span>
+                      </div>
+                    </div>
+                    {isSel && teamLabel && (
+                      <div style={{ background: (teamColor || '#7c3aed') + '33', border: '1px solid ' + (teamColor || '#7c3aed') + '66', color: teamColor || '#7c3aed', borderRadius: 8, padding: '3px 8px', fontSize: 10, fontWeight: 700 }}>{teamLabel}</div>
+                    )}
                   </div>
                 )
               })}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players}</div>
+
+            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px', textAlign: 'center' }}>{sel.length}/4 {t.players}</div>
+
             {myLeagues.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <div className="sub-label">{t.selectLeague}</div>
@@ -969,6 +1016,7 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
                 </select>
               </div>
             )}
+
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <div className="row gap8">
               <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
@@ -1000,6 +1048,7 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
   )
 }
 
+// ═
 // ══ PLAYERS TAB ══
 function PlayersTab({ t, lang, me, players, follows, ratings, toggleFollow, isFollowing, submitRating, getMyRatingFor, setViewPlayerId }) {
   var [search, setSearch] = useState('')
@@ -1626,6 +1675,9 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   var [eP2, setEP2] = useState('')
   var [saving, setSaving] = useState(false)
 
+  var leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
+  var leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
+
   async function saveTeamEdit() {
     setSaving(true)
     await supabase.from('teams').update({ name: eName, player1_id: eP1 || null, player2_id: eP2 || null }).eq('id', editId)
@@ -1633,6 +1685,151 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     setEditId(null)
     setSaving(false)
   }
+
+  async function balanceTeams() {
+    var shuffled = leaguePlayers.slice().sort((a, b) => b.level - a.level)
+    var existing = league.teams || []
+    for (var tm of existing) {
+      await supabase.from('teams').delete().eq('id', tm.id)
+    }
+    var n = Math.floor(shuffled.length / 2)
+    for (var i = 0; i < n; i++) {
+      await supabase.from('teams').insert({
+        league_id: league.id,
+        name: (lang === 'en' ? 'Team ' : 'Équipe ') + (i + 1),
+        player1_id: shuffled[i * 2].id,
+        player2_id: shuffled[i * 2 + 1] ? shuffled[i * 2 + 1].id : null
+      })
+    }
+    await loadLeagues()
+  }
+
+  function PlayerCard({ playerId, onRemove }) {
+    var p = players.find(x => x.id === playerId)
+    if (!p) return null
+    var info = getLevelInfo(p.level)
+    var lbl = lang === 'en' ? info.labelEn : info.label
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+        <Av size={32} photo={p.photo_url} name={p.name} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+          <span style={{ fontSize: 10, color: info.color, background: info.color + '22', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{lbl} {p.level}</span>
+        </div>
+        {onRemove && <button style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }} onClick={onRemove}>✕</button>}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '0 16px' }}>
+      {canEdit && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 12 }}>
+          <button className="btn btn-outline flex1" onClick={() => randomDrawTeams(league.id)}>
+            🎲 {t.randomDraw}
+          </button>
+          <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} onClick={balanceTeams}>
+            ⚖️ {lang === 'fr' ? 'Équilibrer' : 'Balance'}
+          </button>
+        </div>
+      )}
+
+      {(league.teams || []).length === 0 && <div className="empty">{lang === 'en' ? 'No teams yet.' : 'Aucune équipe.'}</div>}
+
+      {(league.teams || []).map(tm => {
+        var p1 = players.find(p => p.id === tm.player1_id)
+        var p2 = players.find(p => p.id === tm.player2_id)
+        var isEd = editId === tm.id
+        var lvl1 = p1 ? p1.level : 0
+        var lvl2 = p2 ? p2.level : 0
+        var teamTotal = (lvl1 + lvl2).toFixed(1)
+
+        return (
+          <div key={tm.id} className="card mb8">
+            {isEd ? (
+              <div>
+                <input className="input mb8" value={eName} onChange={e => setEName(e.target.value)}
+                  placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} />
+
+                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, marginBottom: 6 }}>
+                  {lang === 'fr' ? 'Joueur 1' : 'Player 1'}
+                </div>
+                {eP1 ? (
+                  <div style={{ marginBottom: 8 }}>
+                    <PlayerCard playerId={eP1} onRemove={() => setEP1('')} />
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {leaguePlayers.filter(p => p.id !== eP2).map(p => {
+                      var info = getLevelInfo(p.level)
+                      var lbl = lang === 'en' ? info.labelEn : info.label
+                      return (
+                        <div key={p.id} onClick={() => setEP1(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                          <Av size={32} photo={p.photo_url} name={p.name} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+                            <span style={{ fontSize: 10, color: info.color, background: info.color + '22', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{lbl} {p.level}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, marginBottom: 6 }}>
+                  {lang === 'fr' ? 'Joueur 2' : 'Player 2'}
+                </div>
+                {eP2 ? (
+                  <div style={{ marginBottom: 8 }}>
+                    <PlayerCard playerId={eP2} onRemove={() => setEP2('')} />
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {leaguePlayers.filter(p => p.id !== eP1).map(p => {
+                      var info = getLevelInfo(p.level)
+                      var lbl = lang === 'en' ? info.labelEn : info.label
+                      return (
+                        <div key={p.id} onClick={() => setEP2(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                          <Av size={32} photo={p.photo_url} name={p.name} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600 }}>{p.name}</div>
+                            <span style={{ fontSize: 10, color: info.color, background: info.color + '22', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{lbl} {p.level}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="row gap8">
+                  <button className="btn btn-outline flex1" onClick={() => setEditId(null)}>{t.cancelBtn}</button>
+                  <button className="btn btn-primary flex1" disabled={saving} onClick={saveTeamEdit}>{saving ? '⏳' : t.saveBtn}</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div className="fw600" style={{ fontSize: 14 }}>{tm.name}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: '#6b7280' }}>Niv. {teamTotal}</span>
+                    {canEdit && (
+                      <button className="btn btn-outline btn-sm" onClick={() => { setEditId(tm.id); setEName(tm.name); setEP1(tm.player1_id || ''); setEP2(tm.player2_id || '') }}>✏️</button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {p1 && <PlayerCard playerId={p1.id} />}
+                  {p2 && <PlayerCard playerId={p2.id} />}
+                  {!p1 && !p2 && <div className="text-xs">{lang === 'fr' ? 'Aucun joueur assigné' : 'No players assigned'}</div>}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
   async function handleDraw() {
     await randomDrawTeams(league.id)
