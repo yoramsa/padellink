@@ -1672,7 +1672,7 @@ var leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
                 </select>
                 <select className="select mb8" value={eP2} onChange={e => setEP2(e.target.value)}>
                   <option value="">{lang === 'en' ? 'Player 2' : 'Joueur 2'}</option>
-                  {players.filter(p => p.id !== eP1).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {players.filter(p => p.id !== eP1).map(p => <option key={p.id} value={p.id}>{p.name}(Niv. {p.level}</option>)}
                 </select>
                 <div className="row gap8">
                   <button className="btn btn-outline flex1" onClick={() => setEditId(null)}>{t.cancelBtn}</button>
