@@ -961,14 +961,14 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players}</div>
             {myLeagues.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div className="sub-label">{t.selectLeague}</div>
-                <select className="select" value={leagueId} onChange={e => setLeagueId(e.target.value)}>
-                  <option value="">— {t.matchFree} —</option>
-                  {myLeagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-            )}
+  <div style={{ marginBottom: 10 }}>
+    <div className="sub-label">{t.selectLeague}</div>
+    <select className="select" value={leagueId} onChange={e => setLeagueId(e.target.value)}>
+      <option value="">— {t.matchFree} —</option>
+      {myLeagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+    </select>
+  </div>
+)}
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <div className="row gap8">
               <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
@@ -1240,11 +1240,14 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
         <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>+ {t.createLeague}</button>
       </div>
       {myLeagues.length > 0 && (
-        <div>
-          <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#a855f7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myLeagues}</div>
-          {myLeagues.map(renderLeague)}
-        </div>
-      )}
+  <div style={{ marginBottom: 10 }}>
+    <div className="sub-label">{t.selectLeague}</div>
+    <select className="select" value={leagueId} onChange={e => setLeagueId(e.target.value)}>
+      <option value="">— {t.matchFree} —</option>
+      {myLeagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+    </select>
+  </div>
+)}
       {otherLeagues.length > 0 && (
         <div>
           <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.otherLeagues}</div>
