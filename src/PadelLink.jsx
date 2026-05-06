@@ -961,12 +961,9 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
             </div>
             <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players}</div>
             {myLeagues.length > 0 && (
-  <div style={{ marginBottom: 10 }}>
-    <div className="sub-label">{t.selectLeague}</div>
-    <select className="select" value={leagueId} onChange={e => setLeagueId(e.target.value)}>
-      <option value="">— {t.matchFree} —</option>
-      {myLeagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-    </select>
+  <div>
+    <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#a855f7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myLeagues}</div>
+    {myLeagues.map(renderLeague)}
   </div>
 )}
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
@@ -1240,12 +1237,9 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
         <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>+ {t.createLeague}</button>
       </div>
       {myLeagues.length > 0 && (
-  <div style={{ marginBottom: 10 }}>
-    <div className="sub-label">{t.selectLeague}</div>
-    <select className="select" value={leagueId} onChange={e => setLeagueId(e.target.value)}>
-      <option value="">— {t.matchFree} —</option>
-      {myLeagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-    </select>
+  <div>
+    <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#a855f7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myLeagues}</div>
+    {myLeagues.map(renderLeague)}
   </div>
 )}
       {otherLeagues.length > 0 && (
@@ -1640,13 +1634,27 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   async function handleDraw() {
     await randomDrawTeams(league.id)
   }
-
+async function balanceTeams() {
+  var leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
+  var lp = players.filter(p => leaguePlayerIds.includes(p.id)).slice().sort((a, b) => b.level - a.level)
+  var existing = league.teams || []
+  for (var tm of existing) { await supabase.from('teams').delete().eq('id', tm.id) }
+  var n = Math.floor(lp.length / 2)
+  for (var i = 0; i < n; i++) {
+    await supabase.from('teams').insert({ league_id: league.id, name: (lang === 'en' ? 'Team ' : 'Équipe ') + (i + 1), player1_id: lp[i*2].id, player2_id: lp[i*2+1]?.id || null })
+  }
+  await loadLeagues()
+}
+var leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
+var leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
+  
   return (
     <div style={{ padding: '0 16px' }}>
       {canEdit && (
-        <button className="btn btn-outline mt8" style={{ width: '100%', marginBottom: 12 }} onClick={handleDraw}>
-          🎲 {t.randomDraw}
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 12 }}>
+  <button className="btn btn-outline flex1" onClick={handleDraw}>🎲 {t.randomDraw}</button>
+  <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} onClick={balanceTeams}>⚖️ {lang === 'fr' ? 'Équilibrer' : 'Balance'}</button>
+</div>
       )}
       {(league.teams || []).length === 0 && <div className="empty">{lang === 'en' ? 'No teams yet.' : 'Aucune équipe.'}</div>}
       {(league.teams || []).map(tm => {
@@ -1660,7 +1668,7 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
                 <input className="input mb8" value={eName} onChange={e => setEName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} />
                 <select className="select mb8" value={eP1} onChange={e => setEP1(e.target.value)}>
                   <option value="">{lang === 'en' ? 'Player 1' : 'Joueur 1'}</option>
-                  {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {leaguePlayers.map(p => <option key={p.id} value={p.id}>{p.name} (Niv. {p.level})</option>)}
                 </select>
                 <select className="select mb8" value={eP2} onChange={e => setEP2(e.target.value)}>
                   <option value="">{lang === 'en' ? 'Player 2' : 'Joueur 2'}</option>
