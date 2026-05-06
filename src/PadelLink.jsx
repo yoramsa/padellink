@@ -343,7 +343,24 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
 
   var t = T[lang]
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    loadAll()
+
+    var channel = supabase
+      .channel('free_matches_changes')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'free_matches'
+      }, async () => {
+        await loadFreeMatches()
+        await refreshMe()
+        await loadPlayers()
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [])
 
   async function loadAll() {
     setLoadingData(true)
@@ -378,10 +395,15 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
     }
   }
 
-  async function loadFreeMatches() {
-    var { data } = await supabase.from('free_matches').select('*').order('created_at', { ascending: false })
-    if (data) setFreeMatches(data)
+async function loadFreeMatches() {
+  var { data } = await supabase.from('free_matches').select('*').order('created_at', { ascending: false })
+  var { data: confirmations } = await supabase.from('free_match_confirmations').select('*')
+  console.log('confirmations loaded:', confirmations)
+  if (data) {
+    data.forEach(m => { m.confirmations = confirmations ? confirmations.filter(c => c.match_id === m.id) : [] })
+    setFreeMatches(data)
   }
+}
 
   async function loadLeagueMatches() {
     var { data } = await supabase.from('matches').select('*').order('created_at', { ascending: false })
@@ -472,13 +494,34 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
     await loadFreeMatches()
   }
 
-  async function respondFreeMatch(matchId, confirm) {
-    await supabase.from('free_match_confirmations').insert({ match_id: matchId, player_id: me.id, confirmed: confirm })
+async function respondFreeMatch(matchId, confirm) {
+  var { data: existing } = await supabase
+    .from('free_match_confirmations')
+    .select('player_id')
+    .eq('match_id', matchId)
+    .eq('player_id', me.id)
+    .maybeSingle()
+
+  if (existing) {
     await loadFreeMatches()
-    await refreshMe()
-    await loadPlayers()
+    return
   }
 
+  var { error } = await supabase.from('free_match_confirmations').insert({
+    match_id: matchId,
+    player_id: me.id,
+    confirmed: confirm
+  })
+
+  if (error) {
+    console.error('Confirmation error:', error)
+    return
+  }
+
+  await loadFreeMatches()
+  await refreshMe()
+  await loadPlayers()
+}
   // ── Leagues ──
   async function createLeague(data) {
     var { data: newL, error } = await supabase.from('leagues').insert({
@@ -711,6 +754,7 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
 // ══ HOME ══
 function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatches, leagues, leagueMatches, myAdminLeagues, myLeaveReqs, resolveLeave, createFreeMatch, respondFreeMatch, setViewPlayerId, setTab }) {
   var [showCreate, setShowCreate] = useState(false)
+  var [showAllMatches, setShowAllMatches] = useState(false)
 
   return (
     <div>
@@ -743,15 +787,30 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
           {pendingForMe.map(m => {
             var creator = players.find(p => p.id === m.creator_id)
             var pids = [m.player1_id, m.player2_id, m.player3_id, m.player4_id]
+            var myConfirmation = (m.confirmations || []).find(c => c.player_id === me.id)
+            var nbConfirmed = (m.confirmations || []).filter(c => c.confirmed && c.player_id !== m.creator_id).length
             return (
               <div key={m.id} className="card card-yellow">
                 <div className="fw600 mb4" style={{ fontSize: 13 }}>{creator?.name} — {t.matchFree}</div>
                 <div className="text-xs mb8">{pids.map(id => players.find(p => p.id === id)?.name || '?').join(', ')}</div>
                 {m.sets?.length > 0 && <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 600, marginBottom: 8 }}>{m.sets.map(s => s.a + '-' + s.b).join('  ')}</div>}
-                <div className="row gap8">
-                  <button className="btn btn-primary btn-sm flex1" onClick={() => respondFreeMatch(m.id, true)}>✓ {t.confirm}</button>
-                  <button className="btn btn-danger btn-sm flex1" onClick={() => respondFreeMatch(m.id, false)}>✕ {t.refuse}</button>
-                </div>
+                {myConfirmation ? (
+                  <div style={{ textAlign: 'center', padding: '8px', borderRadius: 8, background: myConfirmation.confirmed ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: myConfirmation.confirmed ? '#10b981' : '#ef4444' }}>
+                      {myConfirmation.confirmed ? '✓ Tu as confirmé' : '✕ Tu as refusé'}
+                    </div>
+                    {myConfirmation.confirmed && (
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                        {nbConfirmed}/3 {lang === 'fr' ? 'confirmation(s)' : 'confirmation(s)'}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="row gap8">
+                    <button className="btn btn-primary btn-sm flex1" onClick={() => respondFreeMatch(m.id, true)}>✓ {t.confirm}</button>
+                    <button className="btn btn-danger btn-sm flex1" onClick={() => respondFreeMatch(m.id, false)}>✕ {t.refuse}</button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -763,7 +822,7 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
       </div>
 
       {showCreate && (
-        <CreateMatchModal t={t} me={me} players={players} followedPlayers={followedPlayers} leagues={leagues}
+        <CreateMatchModal t={t} lang={lang} me={me} players={players} followedPlayers={followedPlayers} leagues={leagues}
           onCreate={async d => { await createFreeMatch(d); setShowCreate(false) }}
           onClose={() => setShowCreate(false)}
         />
@@ -772,7 +831,7 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
       {/* Match history */}
       <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches} ({myMatches.length})</div>
       {myMatches.length === 0 && <div className="empty">{t.noMatches}</div>}
-      {myMatches.slice().reverse().slice(0, 10).map(m => {
+      {myMatches.slice().reverse().slice(0, showAllMatches ? myMatches.length : 5).map(m => {
         var isLeagueMatch = !!m.league_id
         var league = isLeagueMatch ? leagues.find(l => l.id === m.league_id) : null
         var t1n = '?', t2n = '?'
@@ -817,6 +876,17 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
         )
       })}
 
+      {myMatches.length > 5 && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <button className="btn btn-outline" style={{ width: '100%', fontSize: 12 }}
+            onClick={() => setShowAllMatches(!showAllMatches)}>
+            {showAllMatches
+              ? (lang === 'fr' ? '↑ Voir moins' : '↑ See less')
+              : (lang === 'fr' ? '↓ Voir plus (' + (myMatches.length - 5) + ')' : '↓ See more (' + (myMatches.length - 5) + ')')}
+          </button>
+        </div>
+      )}
+
       {/* Followed players */}
       <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>👥 {t.followedPlayers}</div>
       {followedPlayers.length === 0
@@ -837,7 +907,7 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
 }
 
 // ══ CREATE MATCH MODAL ══
-function CreateMatchModal({ t, me, players, followedPlayers, leagues, onCreate, onClose }) {
+function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCreate, onClose }) {
   var [sel, setSel] = useState([me.id])
   var [sets, setSets] = useState([{ a: '', b: '' }])
   var [date, setDate] = useState('')
@@ -859,8 +929,8 @@ function CreateMatchModal({ t, me, players, followedPlayers, leagues, onCreate, 
   var t1names = sel.slice(0, 2).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
   var t2names = sel.slice(2, 4).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
 
-  // Show all players but highlight followed ones
-  var allSelectable = [me, ...players.filter(p => p.id !== me.id)]
+  // Only me + followed players selectable
+  var allSelectable = [me, ...followedPlayers]
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -870,7 +940,7 @@ function CreateMatchModal({ t, me, players, followedPlayers, leagues, onCreate, 
         {step === 1 && (
           <div>
             <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 8 }}>{t.chooseTeams}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4</div>
+            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4 · Seulement tes joueurs suivis</div>
             <div style={{ maxHeight: 280, overflowY: 'auto' }}>
               {allSelectable.map(p => {
                 var isSel = sel.includes(p.id)
@@ -883,13 +953,13 @@ function CreateMatchModal({ t, me, players, followedPlayers, leagues, onCreate, 
                     onClick={isMe ? null : () => toggleSel(p.id)}>
                     <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid ' + (isSel ? '#7c3aed' : '#374151'), background: isSel ? '#7c3aed' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{isSel ? '✓' : ''}</div>
                     <Av size={32} photo={p.photo_url} name={p.name} />
-                    <span style={{ fontSize: 13, flex: 1 }}>{p.name}{isMe ? ' (moi)' : ''}{isFollowed ? ' 👥' : ''}</span>
+                    <span style={{ fontSize: 13, flex: 1 }}>{p.name}{isMe ? ' (moi)' : ''}</span>
                     {isSel && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700 }}>{teamTag}</span>}
                   </div>
                 )
               })}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players} · 👥 = joueur suivi</div>
+            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players}</div>
             {myLeagues.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <div className="sub-label">{t.selectLeague}</div>
@@ -1062,25 +1132,35 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
       {playerMatches.length > 0 && (
         <div>
           <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches}</div>
-          {playerMatches.slice(0, 6).map(m => {
-            var league = m.league_id ? leagues.find(l => l.id === m.league_id) : null
-            var t1n = league ? league.teams?.find(x => x.id === m.team1_id)?.name || 'Éq.1' : [m.player1_id, m.player2_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-            var t2n = league ? league.teams?.find(x => x.id === m.team2_id)?.name || 'Éq.2' : [m.player3_id, m.player4_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-            return (
-              <div key={m.id} className="card" style={{ padding: '10px 14px' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t1n} {t.vs} {t2n}</div>
-                {m.sets?.length > 0 && (
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {m.sets.map((s, i) => <span key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, padding: '2px 8px', fontFamily: "'Bebas Neue',cursive", fontSize: 16, color: s.a > s.b ? '#06b6d4' : s.b > s.a ? '#a855f7' : '#9ca3af' }}>{s.a}-{s.b}</span>)}
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                  {league && <span className="text-xs">{league.name}</span>}
-                  {(m.played_at || m.date) && <span className="text-xs">{m.played_at || m.date}</span>}
-                </div>
-              </div>
-            )
-          })}
+{playerMatches.slice(0, 6).map(m => {
+  var league = m.league_id ? leagues.find(l => l.id === m.league_id) : null
+  var t1n = league ? league.teams?.find(x => x.id === m.team1_id)?.name || 'Éq.1' : [m.player1_id, m.player2_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  var t2n = league ? league.teams?.find(x => x.id === m.team2_id)?.name || 'Éq.2' : [m.player3_id, m.player4_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  var tm1 = league?.teams?.find(x => x.id === m.team1_id)
+  var tm2 = league?.teams?.find(x => x.id === m.team2_id)
+  var t1players = tm1 ? [tm1.player1_id, tm1.player2_id].filter(Boolean).map(id => { var p = players.find(x => x.id === id); return p ? p.name.split(' ')[0] : '?' }).join(' & ') : ''
+var t2players = tm2 ? [tm2.player1_id, tm2.player2_id].filter(Boolean).map(id => { var p = players.find(x => x.id === id); return p ? p.name.split(' ')[0] : '?' }).join(' & ') : ''
+ return (
+    <div key={m.id} className="card" style={{ padding: '10px 14px' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t1n} {t.vs} {t2n}</div>
+      {league && (t1players || t2players) && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: '#06b6d4' }}>{t1players}</span>
+          <span style={{ fontSize: 10, color: '#a855f7' }}>{t2players}</span>
+        </div>
+      )}
+      {m.sets?.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {m.sets.map((s, i) => <span key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, padding: '2px 8px', fontFamily: "'Bebas Neue',cursive", fontSize: 16, color: s.a > s.b ? '#06b6d4' : s.b > s.a ? '#a855f7' : '#9ca3af' }}>{s.a}-{s.b}</span>)}
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        {league && <span className="text-xs">{league.name}</span>}
+        {(m.played_at || m.date) && <span className="text-xs">{m.played_at || m.date}</span>}
+      </div>
+    </div>
+  )
+})}
         </div>
       )}
 
@@ -1190,9 +1270,32 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
   var admin = players.find(p => p.id === league.admin_id)
 
   async function doJoin() {
+    if (league.is_private) {
+      if (!code.trim()) {
+        setCodeError(lang === 'fr' ? 'Entre le code d\'accès.' : 'Enter the access code.')
+        return
+      }
+      var { data: valid, error: rpcErr } = await supabase.rpc('verify_league_code', {
+        p_league_id: league.id,
+        p_code: code.trim()
+      })
+      if (rpcErr || !valid) {
+        setCodeError(lang === 'fr' ? 'Code incorrect.' : 'Wrong code.')
+        return
+      }
+    }
     await joinLeague(league.id)
     setViewLeagueId(league.id)
     setPreviewLeagueId(null)
+  }
+
+  function shareLeague() {
+    var url = window.location.origin + '?league=' + league.id
+    var txt = lang === 'fr'
+      ? '🎾 Rejoins ma ligue PadelLink : *' + league.name + '*\n' + url
+      : '🎾 Join my PadelLink league: *' + league.name + '*\n' + url
+    var wa = 'https://wa.me/?text=' + encodeURIComponent(txt)
+    window.open(wa, '_blank')
   }
 
   return (
@@ -1201,6 +1304,29 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
         <button className="btn btn-outline btn-sm" onClick={() => setPreviewLeagueId(null)}>← {lang === 'en' ? 'Back' : 'Retour'}</button>
         <span className="fw700" style={{ fontSize: 15, marginLeft: 8 }}>{league.is_private ? '🔒 ' : '🌍 '}{league.name}</span>
       </div>
+
+      {!isMem && (
+        <div style={{ padding: '0 16px 10px' }}>
+          {league.is_private && (
+            <div style={{ marginBottom: 8 }}>
+              <input className="input" placeholder={t.enterCode + ' (max 10)'} value={code} maxLength={10}
+                onChange={e => { setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()); setCodeError('') }}
+                style={{ marginBottom: 4 }} />
+              {codeError && <div style={{ fontSize: 11, color: '#ef4444' }}>{codeError}</div>}
+            </div>
+          )}
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={doJoin}>✅ {t.confirmJoin}</button>
+        </div>
+      )}
+      {isMem && (
+        <div style={{ padding: '0 16px 10px', display: 'flex', gap: 8 }}>
+          <button className="btn btn-green flex1" onClick={() => { setViewLeagueId(league.id); setPreviewLeagueId(null) }}>
+            {lang === 'en' ? 'Open league' : 'Ouvrir la ligue'}
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={shareLeague} title="Partager sur WhatsApp">📤</button>
+        </div>
+      )}
+
       <div className="card card-purple">
         <div className="fw700 mb4" style={{ fontSize: 16 }}>{league.name}</div>
         <div className="text-sm mb8">{league.season}</div>
@@ -1235,26 +1361,6 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
         )
       })}
 
-      {!isMem && (
-        <div style={{ padding: '12px 16px' }}>
-          {league.is_private && (
-            <div style={{ marginBottom: 10 }}>
-              <input className="input" placeholder={t.enterCode + ' (max 10)'} value={code} maxLength={10}
-                onChange={e => setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
-                style={{ marginBottom: 6 }} />
-              {codeError && <div style={{ fontSize: 11, color: '#ef4444' }}>{codeError}</div>}
-            </div>
-          )}
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={doJoin}>✅ {t.confirmJoin}</button>
-        </div>
-      )}
-      {isMem && (
-        <div style={{ padding: '12px 16px' }}>
-          <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setViewLeagueId(league.id); setPreviewLeagueId(null) }}>
-            {lang === 'en' ? 'Open league' : 'Ouvrir la ligue'}
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -1342,6 +1448,16 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
       <div className="row" style={{ padding: '14px 16px 4px' }}>
         <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.leagues}</button>
         <span className="fw700" style={{ fontSize: 14, marginLeft: 8 }}>{league.is_private ? '🔒 ' : '🌍 '}{league.name}</span>
+        {isAdmin && (
+          <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto', fontSize: 11 }}
+            onClick={() => {
+              var url = window.location.origin + '?league=' + league.id
+              var txt = lang === 'fr'
+                ? '🎾 Rejoins ma ligue PadelLink : *' + league.name + '*\n' + url
+                : '🎾 Join my PadelLink league: *' + league.name + '*\n' + url
+              window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank')
+            }}>📤 Partager</button>
+        )}
       </div>
       <div style={{ padding: '0 16px 6px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <span className="text-xs">{t.duration}: {league.match_duration}min</span>
@@ -1479,12 +1595,17 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
       {leagueMatches.length === 0 && <div className="empty">{t.noMatchYet}</div>}
       {leagueMatches.slice().reverse().map(m => {
         var t1n = getTeamName(m.team1_id), t2n = getTeamName(m.team2_id)
+        var t1pnames = getTeamPNames(m.team1_id), t2pnames = getTeamPNames(m.team2_id)
         var w = (league.teams || []).find(x => x.id === m.winner_id)
         return (
           <div key={m.id} className="card">
-            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: 13, fontWeight: 700 }}>{t1n} {t.vs} {t2n}</span>
               {m.played_at && <span className="text-xs">{m.played_at}</span>}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ fontSize: 10, color: '#06b6d4' }}>{t1pnames}</span>
+              <span style={{ fontSize: 10, color: '#a855f7' }}>{t2pnames}</span>
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
               {(m.sets || []).map((s, i) => <div key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '4px 10px', fontFamily: "'Bebas Neue',cursive", fontSize: 18, color: s.a > s.b ? '#06b6d4' : s.b > s.a ? '#a855f7' : '#9ca3af' }}>{s.a}-{s.b}</div>)}
@@ -1912,4 +2033,4 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
       )}
     </div>
   )
-}
+                    }
