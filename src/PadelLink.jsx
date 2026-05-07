@@ -345,51 +345,149 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
 
   useEffect(() => { loadAll() }, [])
 
+  useEffect(() => {
+    if (tab === 'players') loadPlayers('', 0)
+    if (tab === 'leagues') loadLeagues(0)
+    if (tab === 'ranking') loadPlayers('', 0)
+  }, [tab])
+
   async function loadAll() {
     setLoadingData(true)
-    await Promise.all([loadPlayers(), loadFollows(), loadRatings(), loadLeagues(), loadFreeMatches(), loadLeagueMatches(), loadLeaveRequests()])
+    await Promise.all([
+      loadPlayers('', 0),
+      loadFollows(),
+      loadRatings(),
+      loadLeagues(0),
+      loadFreeMatches(),
+      loadLeaveRequests()
+    ])
+    await loadLeagueMatches()
     setLoadingData(false)
   }
 
-  async function loadPlayers() {
-    var { data } = await supabase.from('players').select('*').order('points', { ascending: false })
-    if (data) setPlayers(data)
+  async function loadPlayers(searchText = '', page = 0) {
+    var from = page * 20
+    var to = from + 19
+    var q = supabase.from('players').select('*').order('points', { ascending: false }).range(from, to)
+    var clean = (searchText || '').trim()
+    if (clean.length >= 2) q = q.or('name.ilike.%' + clean + '%,city.ilike.%' + clean + '%')
+    var { data } = await q
+    if (data) setPlayers(prev => page === 0 ? data : [...prev, ...data.filter(p => !prev.some(x => x.id === p.id))])
+  }
+
+  async function loadPlayersByIds(ids) {
+    var uniqueIds = [...new Set((ids || []).filter(Boolean))]
+    if (uniqueIds.length === 0) return
+    var missing = uniqueIds.filter(id => !players.some(p => p.id === id))
+    if (missing.length === 0) return
+    var { data } = await supabase.from('players').select('*').in('id', missing)
+    if (data) setPlayers(prev => [...prev, ...data.filter(p => !prev.some(x => x.id === p.id))])
   }
 
   async function loadFollows() {
-    var { data } = await supabase.from('follows').select('*')
+    var { data } = await supabase
+      .from('follows')
+      .select('*')
+      .or('follower_id.eq.' + me.id + ',following_id.eq.' + me.id)
     if (data) setFollows(data)
   }
 
   async function loadRatings() {
-    var { data } = await supabase.from('ratings').select('*')
+    var { data } = await supabase
+      .from('ratings')
+      .select('*')
+      .or('rater_id.eq.' + me.id + ',rated_id.eq.' + me.id)
     if (data) setRatings(data)
   }
 
-  async function loadLeagues() {
-    var { data } = await supabase.from('leagues').select('*').order('created_at', { ascending: false })
-    if (data) {
-      var withMembers = await Promise.all(data.map(async l => {
-        var { data: members } = await supabase.from('league_members').select('player_id,role').eq('league_id', l.id)
-        var { data: teams } = await supabase.from('teams').select('*').eq('league_id', l.id)
-        return { ...l, league_members: members || [], teams: teams || [] }
-      }))
-      setLeagues(withMembers)
+  async function loadLeagues(page = 0) {
+    var from = page * 20
+    var to = from + 19
+
+    var { data: myMemberships } = await supabase
+      .from('league_members')
+      .select('league_id,player_id,role')
+      .eq('player_id', me.id)
+
+    var myLeagueIds = (myMemberships || []).map(m => m.league_id)
+    var loaded = []
+
+    if (myLeagueIds.length > 0) {
+      var { data: mine } = await supabase
+        .from('leagues')
+        .select('*')
+        .in('id', myLeagueIds)
+        .order('created_at', { ascending: false })
+      loaded = loaded.concat(mine || [])
     }
+
+    var publicQuery = supabase
+      .from('leagues')
+      .select('*')
+      .eq('is_private', false)
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (myLeagueIds.length > 0) publicQuery = publicQuery.not('id', 'in', '(' + myLeagueIds.join(',') + ')')
+
+    var { data: publicLeagues } = await publicQuery
+    loaded = loaded.concat(publicLeagues || [])
+
+    var unique = []
+    loaded.forEach(l => { if (!unique.some(x => x.id === l.id)) unique.push(l) })
+    var leagueIds = unique.map(l => l.id)
+
+    if (leagueIds.length === 0) { setLeagues([]); return }
+
+    var { data: members } = await supabase.from('league_members').select('league_id,player_id,role').in('league_id', leagueIds)
+    var { data: teams } = await supabase.from('teams').select('*').in('league_id', leagueIds)
+
+    var withDetails = unique.map(l => ({
+      ...l,
+      league_members: (members || []).filter(m => m.league_id === l.id),
+      teams: (teams || []).filter(tm => tm.league_id === l.id)
+    }))
+
+    await loadPlayersByIds([
+      ...unique.map(l => l.admin_id),
+      ...(members || []).map(m => m.player_id),
+      ...(teams || []).flatMap(tm => [tm.player1_id, tm.player2_id])
+    ])
+
+    setLeagues(prev => page === 0 ? withDetails : [...prev, ...withDetails.filter(l => !prev.some(x => x.id === l.id))])
   }
 
   async function loadFreeMatches() {
-    var { data } = await supabase.from('free_matches').select('*').order('created_at', { ascending: false })
-    if (data) setFreeMatches(data)
+    var { data } = await supabase
+      .from('free_matches')
+      .select('*')
+      .or('creator_id.eq.' + me.id + ',player1_id.eq.' + me.id + ',player2_id.eq.' + me.id + ',player3_id.eq.' + me.id + ',player4_id.eq.' + me.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (data) {
+      setFreeMatches(data)
+      await loadPlayersByIds(data.flatMap(m => [m.creator_id, m.player1_id, m.player2_id, m.player3_id, m.player4_id]))
+    }
   }
 
   async function loadLeagueMatches() {
-    var { data } = await supabase.from('matches').select('*').order('created_at', { ascending: false })
+    var { data: myMemberships } = await supabase
+      .from('league_members')
+      .select('league_id')
+      .eq('player_id', me.id)
+    var ids = (myMemberships || []).map(m => m.league_id)
+    if (ids.length === 0) { setLeagueMatches([]); return }
+    var { data } = await supabase
+      .from('matches')
+      .select('*')
+      .in('league_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(50)
     if (data) setLeagueMatches(data)
   }
 
   async function loadLeaveRequests() {
-    var { data } = await supabase.from('leave_requests').select('*').eq('status', 'pending')
+    var { data } = await supabase.from('leave_requests').select('*').eq('status', 'pending').limit(50)
     if (data) setLeaveRequests(data)
   }
 
@@ -631,7 +729,7 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
         )}
         {tab === 'players' && !viewPlayerId && (
           <PlayersTab t={t} lang={lang} me={me} players={players} follows={follows}
-            ratings={ratings} toggleFollow={toggleFollow} isFollowing={isFollowing}
+            ratings={ratings} loadPlayers={loadPlayers} toggleFollow={toggleFollow} isFollowing={isFollowing}
             submitRating={submitRating} getMyRatingFor={getMyRatingFor}
             setViewPlayerId={setViewPlayerId}
           />
@@ -930,14 +1028,20 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
 }
 
 // ══ PLAYERS TAB ══
-function PlayersTab({ t, lang, me, players, follows, ratings, toggleFollow, isFollowing, submitRating, getMyRatingFor, setViewPlayerId }) {
+function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggleFollow, isFollowing, submitRating, getMyRatingFor, setViewPlayerId }) {
   var [search, setSearch] = useState('')
+  var [page, setPage] = useState(0)
   var [ratingModal, setRatingModal] = useState(null)
 
-  var filtered = players.filter(p =>
-    p.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.city?.toLowerCase().includes(search.toLowerCase())
-  )
+  useEffect(() => {
+    var timer = setTimeout(() => {
+      setPage(0)
+      loadPlayers(search, 0)
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  var filtered = players
 
   return (
     <div>
@@ -980,6 +1084,11 @@ function PlayersTab({ t, lang, me, players, follows, ratings, toggleFollow, isFo
           </div>
         )
       })}
+      <div style={{ padding: '0 16px 16px' }}>
+        <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { var next = page + 1; setPage(next); loadPlayers(search, next) }}>
+          {lang === 'en' ? 'Load more players' : 'Charger plus de joueurs'}
+        </button>
+      </div>
       {ratingModal && (
         <RatingModal t={t} lang={lang} target={ratingModal} myExisting={getMyRatingFor(ratingModal.id)}
           submitRating={submitRating} onClose={() => setRatingModal(null)}
