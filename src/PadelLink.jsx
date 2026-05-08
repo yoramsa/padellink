@@ -891,9 +891,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
             <span className="header-logo">PadelLink</span>
             <div className="header-right">
               {totalNotifs > 0 && <div className="notif-dot">{totalNotifs}</div>}
-              <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : lang === 'en' ? 'he' : 'fr')}>
-  {lang === 'fr' ? '🇬🇧 EN' : lang === 'en' ? '🇮🇱 HE' : '🇫🇷 FR'}
-</button>
+              <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : lang === 'en' ? 'he' : 'fr')}>{lang === 'fr' ? '🇬🇧 EN' : lang === 'en' ? '🇮🇱 HE' : '🇫🇷 FR'}</button>
             </div>
           </div>
 
