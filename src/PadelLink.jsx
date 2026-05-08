@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react'
 import { supabase } from './supabase'
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Plus Jakarta Sans',sans-serif;background:#0a0a0f;color:#fff;}
   .app{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:#0e0e16;}
@@ -24,9 +23,11 @@ const STYLES = `
   .card-purple{border-color:rgba(139,92,246,0.3);background:rgba(139,92,246,0.06);}
   .card-yellow{border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.05);}
   .card-green{border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.05);}
-  .btn{padding:10px 18px;border-radius:12px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:13px;transition:all 0.2s;}
+  .btn{padding:10px 18px;border-radius:12px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:13px;transition:all 0.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+  .btn:active:not(:disabled){transform:scale(0.96);}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;}
   .btn-primary{background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;}
-  .btn-primary:hover{opacity:0.9;}
+  .btn-primary:hover:not(:disabled){opacity:0.9;}
   .btn-outline{background:transparent;border:1px solid rgba(139,92,246,0.4);color:#a855f7;}
   .btn-sm{padding:6px 12px;font-size:11px;border-radius:8px;}
   .btn-danger{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444;}
@@ -93,8 +94,54 @@ const STYLES = `
   .sub-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6b7280;padding:8px 0 4px;}
   .empty{text-align:center;padding:32px 16px;color:#6b7280;font-size:13px;}
   .loading-screen{display:flex;align-items:center;justify-content:center;padding:40px;color:#6b7280;font-size:13px;}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.03) 25%,rgba(255,255,255,0.07) 50%,rgba(255,255,255,0.03) 75%);background-size:1200px 100%;animation:shimmer 1.6s infinite linear;border-radius:10px;}
+  .toast-wrap{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:500;width:calc(100% - 32px);max-width:398px;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+  .toast{padding:12px 18px;border-radius:14px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.6);animation:slideDown 0.25s ease;}
+  .toast-ok{background:linear-gradient(135deg,#059669,#10b981);color:#fff;}
+  .toast-err{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;}
+  .toast-info{background:linear-gradient(135deg,#6d28d9,#a855f7);color:#fff;}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,0.35);border-top-color:#fff;border-radius:50%;animation:spin 0.65s linear infinite;flex-shrink:0;}
 `
 
+// ── Toast & Confirm contexts ──
+const ToastCtx = createContext(null)
+const ConfirmCtx = createContext(null)
+const useToast = () => useContext(ToastCtx)
+const useConfirm = () => useContext(ConfirmCtx)
+
+function ToastContainer({ toasts }) {
+  if (!toasts.length) return null
+  return (
+    <div className="toast-wrap">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast toast-${t.type}`}>{t.msg}</div>
+      ))}
+    </div>
+  )
+}
+
+function ConfirmModal({ msg, onConfirm, onCancel, confirmLabel = 'Confirmer', cancelLabel = 'Annuler', danger = true }) {
+  return (
+    <div className="modal-overlay" style={{ zIndex: 300 }} onClick={onCancel}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', padding: '28px 20px 32px' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+        <div className="fw700 mb12" style={{ fontSize: 15, lineHeight: 1.6 }}>{msg}</div>
+        <div className="row gap8" style={{ marginTop: 16 }}>
+          <button className="btn btn-outline flex1" onClick={onCancel}>{cancelLabel}</button>
+          <button className={`btn ${danger ? 'btn-danger' : 'btn-primary'} flex1`} onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Spin() { return <span className="spin" /> }
+
+// ── Level definitions ──
 const LEVELS = [
   {val:1.0,label:'Débutant',labelEn:'Beginner',color:'#6b7280',desc:'Débute le padel, apprentissage des bases.',descEn:'Just starting padel, learning the basics.'},
   {val:1.5,label:'Débutant+',labelEn:'Beginner+',color:'#9ca3af',desc:'Connait les règles, quelques échanges.',descEn:'Knows the rules, can rally.'},
@@ -166,6 +213,16 @@ const T = {
     waitingConfirm:'En attente de',pendingCount:'confirmation(s)',
     cancelBtn:'Annuler',saveBtn:'Sauvegarder',loading:'Chargement...',
     age:'ans',followedPlayers:'Joueurs suivis',
+    confirmSignOut:'Se déconnecter ?',
+    confirmExpel:'Expulser ce joueur de la ligue ?',
+    confirmDraw:'Lancer le tirage ? Les équipes existantes seront supprimées.',
+    confirmBalance:'Équilibrer les équipes ? Les équipes existantes seront supprimées.',
+    confirmLeave:'Envoyer une demande de sortie à l\'admin ?',
+    errorGeneric:'Une erreur est survenue.',
+    saved:'✓ Sauvegardé !',profileUpdated:'✓ Profil mis à jour !',
+    matchConfirmed:'✓ Match confirmé !',matchRefused:'Match refusé.',
+    leagueJoined:'✓ Ligue rejointe !',leagueLeft:'Demande de sortie envoyée.',
+    wrongCode:'Code incorrect.',nameRequired:'Nom trop court (min. 2 car.).',cityRequired:'Ville requise.',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -208,64 +265,73 @@ const T = {
     waitingConfirm:'Waiting for',pendingCount:'confirmation(s)',
     cancelBtn:'Cancel',saveBtn:'Save',loading:'Loading...',
     age:'years old',followedPlayers:'Followed players',
+    confirmSignOut:'Sign out?',
+    confirmExpel:'Expel this player from the league?',
+    confirmDraw:'Start draw? Existing teams will be deleted.',
+    confirmBalance:'Balance teams? Existing teams will be deleted.',
+    confirmLeave:'Send a leave request to the admin?',
+    errorGeneric:'Something went wrong.',
+    saved:'✓ Saved!',profileUpdated:'✓ Profile updated!',
+    matchConfirmed:'✓ Match confirmed!',matchRefused:'Match declined.',
+    leagueJoined:'✓ League joined!',leagueLeft:'Leave request sent.',
+    wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
   }
 }
 
 // ── Helpers ──
 function calcAge(dob) {
   if (!dob) return null
-  var today = new Date(), birth = new Date(dob)
-  var age = today.getFullYear() - birth.getFullYear()
-  var m = today.getMonth() - birth.getMonth()
+  const today = new Date(), birth = new Date(dob)
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
   return age
 }
 
 function computeRatingAvg(ratings, key) {
   if (!ratings || !ratings.length) return 0
-  var total = ratings.reduce((a, r) => a + (r[key] || 0), 0)
-  return total / ratings.length
+  return ratings.reduce((a, r) => a + (r[key] || 0), 0) / ratings.length
 }
 
 function computeBadges(player, ratings) {
-  var b = []
+  const b = []
   if (player.wins >= 25) b.push('🥇')
   else if (player.wins >= 10) b.push('🏆')
   if (player.level >= 4.5) b.push('🎯')
-  var h = player.win_history || []
+  const h = player.win_history || []
   if (h.length >= 5 && h.slice(-5).every(x => x === 1)) b.push('⚡')
   if (player.matches >= 20) b.push('🏅')
   if (ratings && ratings.length >= 3) {
-    var fpAvg = computeRatingAvg(ratings, 'fairplay')
-    if (fpAvg > 4.8) b.push('🤝')
+    if (computeRatingAvg(ratings, 'fairplay') > 4.8) b.push('🤝')
   }
   return b
 }
 
 function matchWinner(t1Id, t2Id, sets) {
-  var w1 = 0, w2 = 0
+  let w1 = 0, w2 = 0
   ;(sets || []).forEach(s => { if (s.a > s.b) w1++; else if (s.b > s.a) w2++ })
   return w1 > w2 ? t1Id : t2Id
 }
 
 // ── UI Components ──
 function Av({ size = 40, photo, name = '?' }) {
-  var init = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  const init = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   if (photo) return <img src={photo} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }} alt={name} />
   return <div className="avatar" style={{ width: size, height: size, fontSize: size * 0.36, background: 'linear-gradient(135deg,#7c3aed,#06b6d4)' }}>{init}</div>
 }
 
 function LvBadge({ val, lang = 'fr' }) {
-  var info = getLevelInfo(val)
-  var lbl = lang === 'en' ? info.labelEn : info.label
+  const info = getLevelInfo(val)
+  const lbl = lang === 'en' ? info.labelEn : info.label
   return <span style={{ background: info.color + '22', border: '1px solid ' + info.color + '55', color: info.color, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{lbl} ({val})</span>
 }
 
 function Stars({ val, onChange, readOnly }) {
   return (
     <div className="stars">
-      {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} className="star" style={{ color: i <= Math.round(val) ? '#f59e0b' : '#374151' }} onClick={readOnly ? null : () => onChange(i)}>★</span>
+      {[1,2,3,4,5].map(i => (
+        <span key={i} className="star" style={{ color: i <= Math.round(val) ? '#f59e0b' : '#374151' }}
+          onClick={readOnly ? null : () => onChange(i)}>★</span>
       ))}
     </div>
   )
@@ -284,8 +350,8 @@ function SetsInput({ sets, onChange, t }) {
   function add() { onChange([...sets, { a: '', b: '' }]) }
   function rem(i) { onChange(sets.filter((_, j) => j !== i)) }
   function upd(i, k, v) {
-    var clean = v.replace(/[^0-9]/g, '')
-    var num = parseInt(clean)
+    const clean = v.replace(/[^0-9]/g, '')
+    const num = parseInt(clean)
     if (clean !== '' && (isNaN(num) || num > 99)) return
     onChange(sets.map((s, j) => j !== i ? s : { ...s, [k]: clean }))
   }
@@ -307,9 +373,9 @@ function SetsInput({ sets, onChange, t }) {
 
 function SetsPreview({ sets, t1name, t2name }) {
   if (!sets?.length) return null
-  var w1 = 0, w2 = 0
+  let w1 = 0, w2 = 0
   sets.forEach(s => { if (s.a > s.b) w1++; else if (s.b > s.a) w2++ })
-  var win = w1 > w2 ? t1name : w2 > w1 ? t2name : ''
+  const win = w1 > w2 ? t1name : w2 > w1 ? t2name : ''
   return (
     <div style={{ background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '10px', margin: '8px 0' }}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -320,28 +386,57 @@ function SetsPreview({ sets, t1name, t2name }) {
   )
 }
 
+// ── Skeleton rows for background loading ──
+function SkeletonCard({ lines = 2 }) {
+  return (
+    <div className="card" style={{ opacity: 0.7 }}>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className="skeleton" style={{ height: 14, marginBottom: i < lines - 1 ? 10 : 0, width: i === 0 ? '70%' : '50%' }} />
+      ))}
+    </div>
+  )
+}
+
 // ══════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════
-export default function PadelLink({ session, player: initialPlayer, onSignOut }) {
-  var [lang, setLang] = useState('fr')
-  var [tab, setTab] = useState('home')
-  var [me, setMe] = useState(initialPlayer)
-  var [players, setPlayers] = useState([])
-  var [follows, setFollows] = useState([]) // [{follower_id, following_id}]
-  var [ratings, setRatings] = useState([]) // all ratings
-  var [leagues, setLeagues] = useState([])
-  var [freeMatches, setFreeMatches] = useState([])
-  var [leagueMatches, setLeagueMatches] = useState([])
-  var [leaveRequests, setLeaveRequests] = useState([])
-  var [viewPlayerId, setViewPlayerId] = useState(null)
-  var [viewLeagueId, setViewLeagueId] = useState(null)
-  var [previewLeagueId, setPreviewLeagueId] = useState(null)
-  var [selectedLeagueTab, setSelectedLeagueTab] = useState('ranking2')
-  var [rankTab, setRankTab] = useState('world')
-  var [loadingData, setLoadingData] = useState(true)
+export default function PadelLink({ session, player: initialPlayer, pendingLeagueId, onClearPendingLeague, onSignOut }) {
+  const [lang, setLang] = useState('fr')
+  const [tab, setTab] = useState('home')
+  const [me, setMe] = useState(initialPlayer)
+  const [players, setPlayers] = useState([])
+  const [follows, setFollows] = useState([])
+  const [ratings, setRatings] = useState([])
+  const [leagues, setLeagues] = useState([])
+  const [freeMatches, setFreeMatches] = useState([])
+  const [leagueMatches, setLeagueMatches] = useState([])
+  const [leaveRequests, setLeaveRequests] = useState([])
+  const [viewPlayerId, setViewPlayerId] = useState(null)
+  const [viewLeagueId, setViewLeagueId] = useState(null)
+  const [previewLeagueId, setPreviewLeagueId] = useState(null)
+  const [selectedLeagueTab, setSelectedLeagueTab] = useState('ranking2')
+  const [rankTab, setRankTab] = useState('world')
+  const [loadingData, setLoadingData] = useState(true)
+  const [loadingBg, setLoadingBg] = useState(true)
 
-  var t = T[lang]
+  // Toast state
+  const [toasts, setToasts] = useState([])
+  const [confirmState, setConfirmState] = useState(null)
+
+  const t = T[lang]
+
+  const showToast = useCallback((msg, type = 'ok') => {
+    const id = Date.now() + Math.random()
+    setToasts(prev => [...prev, { id, msg, type }])
+    setTimeout(() => setToasts(prev => prev.filter(x => x.id !== id)), 3000)
+  }, [])
+
+  const confirm = useCallback((msg) => new Promise(resolve => {
+    setConfirmState({ msg, resolve })
+  }), [])
+
+  const handleConfirm = () => { confirmState?.resolve(true); setConfirmState(null) }
+  const handleConfirmCancel = () => { confirmState?.resolve(false); setConfirmState(null) }
 
   useEffect(() => { loadAll() }, [])
 
@@ -351,119 +446,93 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
     if (tab === 'ranking') loadPlayers('', 0)
   }, [tab])
 
+  // Handle league invitation URL
+  useEffect(() => {
+    if (!pendingLeagueId || loadingBg) return
+    const league = leagues.find(l => l.id === pendingLeagueId)
+    if (league) {
+      setTab('leagues')
+      setPreviewLeagueId(pendingLeagueId)
+      onClearPendingLeague?.()
+    }
+  }, [pendingLeagueId, loadingBg, leagues])
+
+  // Phase 1: critical user data only → show UI fast
+  // Phase 2: players + leagues (background)
   async function loadAll() {
     setLoadingData(true)
-    await Promise.all([
-      loadPlayers('', 0),
-      loadFollows(),
-      loadRatings(),
-      loadLeagues(0),
-      loadFreeMatches(),
-      loadLeaveRequests()
-    ])
-    await loadLeagueMatches()
+    await Promise.all([loadFollows(), loadRatings(), loadFreeMatches(), loadLeaveRequests()])
     setLoadingData(false)
+    // Background phase
+    await Promise.all([loadPlayers('', 0), loadLeagues(0)])
+    await loadLeagueMatches()
+    setLoadingBg(false)
   }
 
   async function loadPlayers(searchText = '', page = 0) {
-    var from = page * 20
-    var to = from + 19
-    var q = supabase.from('players').select('*').order('points', { ascending: false }).range(from, to)
-    var clean = (searchText || '').trim()
+    const from = page * 20, to = from + 19
+    let q = supabase.from('players').select('*').order('points', { ascending: false }).range(from, to)
+    const clean = (searchText || '').trim()
     if (clean.length >= 2) q = q.or('name.ilike.%' + clean + '%,city.ilike.%' + clean + '%')
-    var { data } = await q
+    const { data } = await q
     if (data) setPlayers(prev => page === 0 ? data : [...prev, ...data.filter(p => !prev.some(x => x.id === p.id))])
   }
 
   async function loadPlayersByIds(ids) {
-    var uniqueIds = [...new Set((ids || []).filter(Boolean))]
-    if (uniqueIds.length === 0) return
-    var missing = uniqueIds.filter(id => !players.some(p => p.id === id))
-    if (missing.length === 0) return
-    var { data } = await supabase.from('players').select('*').in('id', missing)
+    const uniqueIds = [...new Set((ids || []).filter(Boolean))]
+    if (!uniqueIds.length) return
+    const missing = uniqueIds.filter(id => !players.some(p => p.id === id))
+    if (!missing.length) return
+    const { data } = await supabase.from('players').select('*').in('id', missing)
     if (data) setPlayers(prev => [...prev, ...data.filter(p => !prev.some(x => x.id === p.id))])
   }
 
   async function loadFollows() {
-    var { data } = await supabase
-      .from('follows')
-      .select('*')
-      .or('follower_id.eq.' + me.id + ',following_id.eq.' + me.id)
+    const { data } = await supabase.from('follows').select('*').or(`follower_id.eq.${me.id},following_id.eq.${me.id}`)
     if (data) setFollows(data)
   }
 
   async function loadRatings() {
-    var { data } = await supabase
-      .from('ratings')
-      .select('*')
-      .or('rater_id.eq.' + me.id + ',rated_id.eq.' + me.id)
+    const { data } = await supabase.from('ratings').select('*').or(`rater_id.eq.${me.id},rated_id.eq.${me.id}`)
     if (data) setRatings(data)
   }
 
   async function loadLeagues(page = 0) {
-    var from = page * 20
-    var to = from + 19
-
-    var { data: myMemberships } = await supabase
-      .from('league_members')
-      .select('league_id,player_id,role')
-      .eq('player_id', me.id)
-
-    var myLeagueIds = (myMemberships || []).map(m => m.league_id)
-    var loaded = []
-
+    const from = page * 20, to = from + 19
+    const { data: myMemberships } = await supabase.from('league_members').select('league_id,player_id,role').eq('player_id', me.id)
+    const myLeagueIds = (myMemberships || []).map(m => m.league_id)
+    let loaded = []
     if (myLeagueIds.length > 0) {
-      var { data: mine } = await supabase
-        .from('leagues')
-        .select('*')
-        .in('id', myLeagueIds)
-        .order('created_at', { ascending: false })
+      const { data: mine } = await supabase.from('leagues').select('*').in('id', myLeagueIds).order('created_at', { ascending: false })
       loaded = loaded.concat(mine || [])
     }
-
-    var publicQuery = supabase
-      .from('leagues')
-      .select('*')
-      .eq('is_private', false)
-      .order('created_at', { ascending: false })
-      .range(from, to)
-
+    let publicQuery = supabase.from('leagues').select('*').eq('is_private', false).order('created_at', { ascending: false }).range(from, to)
     if (myLeagueIds.length > 0) publicQuery = publicQuery.not('id', 'in', '(' + myLeagueIds.join(',') + ')')
-
-    var { data: publicLeagues } = await publicQuery
+    const { data: publicLeagues } = await publicQuery
     loaded = loaded.concat(publicLeagues || [])
-
-    var unique = []
+    const unique = []
     loaded.forEach(l => { if (!unique.some(x => x.id === l.id)) unique.push(l) })
-    var leagueIds = unique.map(l => l.id)
-
-    if (leagueIds.length === 0) { setLeagues([]); return }
-
-    var { data: members } = await supabase.from('league_members').select('league_id,player_id,role').in('league_id', leagueIds)
-    var { data: teams } = await supabase.from('teams').select('*').in('league_id', leagueIds)
-
-    var withDetails = unique.map(l => ({
+    const leagueIds = unique.map(l => l.id)
+    if (!leagueIds.length) { setLeagues([]); return }
+    const { data: members } = await supabase.from('league_members').select('league_id,player_id,role').in('league_id', leagueIds)
+    const { data: teams } = await supabase.from('teams').select('*').in('league_id', leagueIds)
+    const withDetails = unique.map(l => ({
       ...l,
       league_members: (members || []).filter(m => m.league_id === l.id),
       teams: (teams || []).filter(tm => tm.league_id === l.id)
     }))
-
     await loadPlayersByIds([
       ...unique.map(l => l.admin_id),
       ...(members || []).map(m => m.player_id),
       ...(teams || []).flatMap(tm => [tm.player1_id, tm.player2_id])
     ])
-
     setLeagues(prev => page === 0 ? withDetails : [...prev, ...withDetails.filter(l => !prev.some(x => x.id === l.id))])
   }
 
   async function loadFreeMatches() {
-    var { data } = await supabase
-      .from('free_matches')
-      .select('*')
-      .or('creator_id.eq.' + me.id + ',player1_id.eq.' + me.id + ',player2_id.eq.' + me.id + ',player3_id.eq.' + me.id + ',player4_id.eq.' + me.id)
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const { data } = await supabase.from('free_matches').select('*')
+      .or(`creator_id.eq.${me.id},player1_id.eq.${me.id},player2_id.eq.${me.id},player3_id.eq.${me.id},player4_id.eq.${me.id}`)
+      .order('created_at', { ascending: false }).limit(50)
     if (data) {
       setFreeMatches(data)
       await loadPlayersByIds(data.flatMap(m => [m.creator_id, m.player1_id, m.player2_id, m.player3_id, m.player4_id]))
@@ -471,35 +540,27 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
   }
 
   async function loadLeagueMatches() {
-    var { data: myMemberships } = await supabase
-      .from('league_members')
-      .select('league_id')
-      .eq('player_id', me.id)
-    var ids = (myMemberships || []).map(m => m.league_id)
-    if (ids.length === 0) { setLeagueMatches([]); return }
-    var { data } = await supabase
-      .from('matches')
-      .select('*')
-      .in('league_id', ids)
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const { data: myMemberships } = await supabase.from('league_members').select('league_id').eq('player_id', me.id)
+    const ids = (myMemberships || []).map(m => m.league_id)
+    if (!ids.length) { setLeagueMatches([]); return }
+    const { data } = await supabase.from('matches').select('*').in('league_id', ids).order('created_at', { ascending: false }).limit(50)
     if (data) setLeagueMatches(data)
   }
 
   async function loadLeaveRequests() {
-    var { data } = await supabase.from('leave_requests').select('*').eq('status', 'pending').limit(50)
+    const { data } = await supabase.from('leave_requests').select('*').eq('status', 'pending').limit(50)
     if (data) setLeaveRequests(data)
   }
 
   async function refreshMe() {
-    var { data } = await supabase.from('players').select('*').eq('id', me.id).single()
+    const { data } = await supabase.from('players').select('*').eq('id', me.id).single()
     if (data) setMe(data)
   }
 
-  // ── Follow / Unfollow ──
+  // ── Follow ──
   async function toggleFollow(targetId) {
-    var isFollowing = follows.some(f => f.follower_id === me.id && f.following_id === targetId)
-    if (isFollowing) {
+    const isF = follows.some(f => f.follower_id === me.id && f.following_id === targetId)
+    if (isF) {
       await supabase.from('follows').delete().eq('follower_id', me.id).eq('following_id', targetId)
     } else {
       await supabase.from('follows').insert({ follower_id: me.id, following_id: targetId })
@@ -507,143 +568,121 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
     await loadFollows()
   }
 
-  function isFollowing(targetId) {
-    return follows.some(f => f.follower_id === me.id && f.following_id === targetId)
-  }
-
+  function isFollowing(targetId) { return follows.some(f => f.follower_id === me.id && f.following_id === targetId) }
   function getFollowedPlayers() {
-    var ids = follows.filter(f => f.follower_id === me.id).map(f => f.following_id)
+    const ids = follows.filter(f => f.follower_id === me.id).map(f => f.following_id)
     return players.filter(p => ids.includes(p.id))
   }
 
   // ── Ratings ──
   async function submitRating(targetId, newRatings) {
     await supabase.from('ratings').upsert({
-      rater_id: me.id,
-      rated_id: targetId,
-      fairplay: newRatings.fairplay,
-      service: newRatings.service,
-      reflex: newRatings.reflex,
-      power: newRatings.power,
+      rater_id: me.id, rated_id: targetId,
+      fairplay: newRatings.fairplay, service: newRatings.service,
+      reflex: newRatings.reflex, power: newRatings.power,
       level_rating: newRatings.level
     }, { onConflict: 'rater_id,rated_id' })
     await loadRatings()
   }
 
-  function getPlayerRatings(playerId) {
-    return ratings.filter(r => r.rated_id === playerId)
-  }
+  function getPlayerRatings(playerId) { return ratings.filter(r => r.rated_id === playerId) }
+  function getMyRatingFor(targetId) { return ratings.find(r => r.rater_id === me.id && r.rated_id === targetId) }
 
-  function getMyRatingFor(targetId) {
-    return ratings.find(r => r.rater_id === me.id && r.rated_id === targetId)
-  }
-
-  // ── Profile update ──
+  // ── Profile ──
   async function updateProfile(updates) {
-    await supabase.from('players').update(updates).eq('id', me.id)
+    const { error } = await supabase.from('players').update(updates).eq('id', me.id)
+    if (error) throw error
     await refreshMe()
-    await loadPlayers()
+    await loadPlayers('', 0)
   }
 
   async function uploadPhoto(file) {
-    var ext = file.name.split('.').pop()
-    var path = me.id + '/avatar.' + ext
-    var { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    const ext = file.name.split('.').pop()
+    const path = `${me.id}/avatar.${ext}`
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
     if (!error) {
-      var { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
       await updateProfile({ photo_url: data.publicUrl })
     }
   }
 
   // ── Free matches ──
   async function createFreeMatch(data) {
-    await supabase.from('free_matches').insert({
+    const { error } = await supabase.from('free_matches').insert({
       creator_id: me.id,
-      player1_id: data.playerIds[0],
-      player2_id: data.playerIds[1],
-      player3_id: data.playerIds[2],
-      player4_id: data.playerIds[3],
-      sets: data.sets,
-      played_at: data.date || null,
-      status: 'pending'
+      player1_id: data.playerIds[0], player2_id: data.playerIds[1],
+      player3_id: data.playerIds[2], player4_id: data.playerIds[3],
+      sets: data.sets, played_at: data.date || null, status: 'pending'
     })
+    if (error) throw error
     await loadFreeMatches()
   }
 
-  async function respondFreeMatch(matchId, confirm) {
-    await supabase.from('free_match_confirmations').insert({ match_id: matchId, player_id: me.id, confirmed: confirm })
+  async function respondFreeMatch(matchId, confirmed) {
+    const { error } = await supabase.from('free_match_confirmations').insert({ match_id: matchId, player_id: me.id, confirmed })
+    if (error) throw error
     await loadFreeMatches()
     await refreshMe()
-    await loadPlayers()
+    await loadPlayers('', 0)
   }
 
   // ── Leagues ──
   async function createLeague(data) {
-    var { data: newL, error } = await supabase.from('leagues').insert({
+    const { data: newL, error } = await supabase.from('leagues').insert({
       name: data.name, season: data.season, rules: data.rules,
       sets_per_match: data.setsPerMatch, match_duration: data.matchDuration,
       min_age: data.minAge, is_private: data.isPrivate,
-      access_code_hash: data.isPrivate ? data.code : null,
-      admin_id: me.id
+      access_code_hash: data.isPrivate ? data.code : null, admin_id: me.id
     }).select().single()
-    if (!error && newL) {
-      await supabase.from('league_members').insert({ league_id: newL.id, player_id: me.id, role: 'admin' })
-      await loadLeagues()
-    }
+    if (error) throw error
+    await supabase.from('league_members').insert({ league_id: newL.id, player_id: me.id, role: 'admin' })
+    await loadLeagues(0)
   }
 
   async function joinLeague(leagueId) {
-    var already = leagues.find(l => l.id === leagueId)?.league_members?.some(lm => lm.player_id === me.id)
+    const already = leagues.find(l => l.id === leagueId)?.league_members?.some(lm => lm.player_id === me.id)
     if (already) return
-    await supabase.from('league_members').insert({ league_id: leagueId, player_id: me.id, role: 'member' })
-    await loadLeagues()
+    const { error } = await supabase.from('league_members').insert({ league_id: leagueId, player_id: me.id, role: 'member' })
+    if (error) throw error
+    await loadLeagues(0)
   }
 
   async function requestLeave(leagueId) {
-    var already = leaveRequests.some(r => r.league_id === leagueId && r.player_id === me.id)
+    const already = leaveRequests.some(r => r.league_id === leagueId && r.player_id === me.id)
     if (already) return
-    await supabase.from('leave_requests').insert({ league_id: leagueId, player_id: me.id })
+    const { error } = await supabase.from('leave_requests').insert({ league_id: leagueId, player_id: me.id })
+    if (error) throw error
     await loadLeaveRequests()
   }
 
   async function resolveLeave(leagueId, playerId, approve) {
     await supabase.from('leave_requests').update({ status: approve ? 'approved' : 'declined', resolved_at: new Date().toISOString() })
       .eq('league_id', leagueId).eq('player_id', playerId).eq('status', 'pending')
-    if (approve) {
-      await supabase.from('league_members').delete().eq('league_id', leagueId).eq('player_id', playerId)
-    }
-    await loadLeagues()
+    if (approve) await supabase.from('league_members').delete().eq('league_id', leagueId).eq('player_id', playerId)
+    await loadLeagues(0)
     await loadLeaveRequests()
   }
 
   async function expelMember(leagueId, playerId) {
-    await supabase.from('league_members').delete().eq('league_id', leagueId).eq('player_id', playerId)
-    await loadLeagues()
+    const { error } = await supabase.from('league_members').delete().eq('league_id', leagueId).eq('player_id', playerId)
+    if (error) throw error
+    await loadLeagues(0)
   }
 
   async function toggleSubAdmin(leagueId, playerId) {
-    var lm = leagues.find(l => l.id === leagueId)?.league_members?.find(m => m.player_id === playerId)
-    var newRole = lm?.role === 'sub_admin' ? 'member' : 'sub_admin'
+    const lm = leagues.find(l => l.id === leagueId)?.league_members?.find(m => m.player_id === playerId)
+    const newRole = lm?.role === 'sub_admin' ? 'member' : 'sub_admin'
     await supabase.from('league_members').update({ role: newRole }).eq('league_id', leagueId).eq('player_id', playerId)
-    await loadLeagues()
+    await loadLeagues(0)
   }
 
   async function addLeagueMatch(leagueId, matchData) {
-    var { error } = await supabase.from('matches').insert({
-      league_id: leagueId,
-      team1_id: matchData.team1Id,
-      team2_id: matchData.team2Id,
-      sets: matchData.sets,
-      winner_id: matchData.winnerId,
-      played_at: matchData.date || null,
-      posted_by: me.id
+    const { error } = await supabase.from('matches').insert({
+      league_id: leagueId, team1_id: matchData.team1Id, team2_id: matchData.team2Id,
+      sets: matchData.sets, winner_id: matchData.winnerId,
+      played_at: matchData.date || null, posted_by: me.id
     })
-    if (!error) {
-      await loadLeagueMatches()
-      await loadLeagues()
-      await refreshMe()
-      await loadPlayers()
-    }
+    if (!error) { await loadLeagueMatches(); await loadLeagues(0); await refreshMe(); await loadPlayers('', 0) }
     return error
   }
 
@@ -652,180 +691,215 @@ export default function PadelLink({ session, player: initialPlayer, onSignOut })
   }
 
   async function randomDrawTeams(leagueId) {
-    var league = leagues.find(l => l.id === leagueId)
-    var leaguePlayerIds = (league?.league_members || []).map(lm => lm.player_id)
-    var lp = players.filter(p => leaguePlayerIds.includes(p.id)).slice().sort(() => Math.random() - 0.5)
-    var existing = league?.teams || []
-    for (var tm of existing) { await supabase.from('teams').delete().eq('id', tm.id) }
-    var half = Math.floor(lp.length / 2)
-    var team1 = lp.slice(0, half)
-    var team2 = lp.slice(half)
-    if (team1.length > 0) {
-      await supabase.from('teams').insert({ league_id: leagueId, name: lang === 'en' ? 'Team 1' : 'Équipe 1', player1_id: team1[0]?.id || null, player2_id: team1[1]?.id || null })
-    }
-    if (team2.length > 0) {
-      await supabase.from('teams').insert({ league_id: leagueId, name: lang === 'en' ? 'Team 2' : 'Équipe 2', player1_id: team2[0]?.id || null, player2_id: team2[1]?.id || null })
-    }
-    await loadLeagues()
+    const league = leagues.find(l => l.id === leagueId)
+    const leaguePlayerIds = (league?.league_members || []).map(lm => lm.player_id)
+    const lp = players.filter(p => leaguePlayerIds.includes(p.id)).slice().sort(() => Math.random() - 0.5)
+    for (const tm of (league?.teams || [])) { await supabase.from('teams').delete().eq('id', tm.id) }
+    const half = Math.floor(lp.length / 2)
+    const team1 = lp.slice(0, half), team2 = lp.slice(half)
+    if (team1.length) await supabase.from('teams').insert({ league_id: leagueId, name: lang === 'en' ? 'Team 1' : 'Équipe 1', player1_id: team1[0]?.id || null, player2_id: team1[1]?.id || null })
+    if (team2.length) await supabase.from('teams').insert({ league_id: leagueId, name: lang === 'en' ? 'Team 2' : 'Équipe 2', player1_id: team2[0]?.id || null, player2_id: team2[1]?.id || null })
+    await loadLeagues(0)
   }
 
   // ── Computed ──
-  var followedPlayers = getFollowedPlayers()
-  var pendingForMe = freeMatches.filter(m =>
+  const followedPlayers = getFollowedPlayers()
+  const pendingForMe = freeMatches.filter(m =>
     m.status === 'pending' &&
     [m.player1_id, m.player2_id, m.player3_id, m.player4_id].includes(me.id) &&
     m.creator_id !== me.id
   )
-  var myAdminLeagues = leagues.filter(l => l.admin_id === me.id)
-  var myLeaveReqs = leaveRequests.filter(r => myAdminLeagues.some(l => l.id === r.league_id))
-  var totalNotifs = pendingForMe.length + myLeaveReqs.length
-
-  var activeLeague = viewLeagueId ? leagues.find(l => l.id === viewLeagueId) : null
-  var previewLeague = previewLeagueId ? leagues.find(l => l.id === previewLeagueId) : null
-
-  var confirmedFreeMatches = freeMatches.filter(m => m.status === 'confirmed')
-  var myMatches = [
+  const myAdminLeagues = leagues.filter(l => l.admin_id === me.id)
+  const myLeaveReqs = leaveRequests.filter(r => myAdminLeagues.some(l => l.id === r.league_id))
+  const totalNotifs = pendingForMe.length + myLeaveReqs.length
+  const activeLeague = viewLeagueId ? leagues.find(l => l.id === viewLeagueId) : null
+  const previewLeague = previewLeagueId ? leagues.find(l => l.id === previewLeagueId) : null
+  const confirmedFreeMatches = freeMatches.filter(m => m.status === 'confirmed')
+  const myMatches = [
     ...confirmedFreeMatches.filter(m => [m.player1_id, m.player2_id, m.player3_id, m.player4_id].includes(me.id)),
     ...leagueMatches.filter(m => {
-      var league = leagues.find(l => l.id === m.league_id)
-      if (!league) return false
-      var myTeam = league.teams?.find(tm => tm.player1_id === me.id || tm.player2_id === me.id)
-      return !!myTeam
+      const league = leagues.find(l => l.id === m.league_id)
+      return league?.teams?.some(tm => tm.player1_id === me.id || tm.player2_id === me.id)
     })
   ]
+  const myRatings = getPlayerRatings(me.id)
+  const myBadges = computeBadges(me, myRatings)
 
-  var myRatings = getPlayerRatings(me.id)
-  var myBadges = computeBadges(me, myRatings)
-
-  if (loadingData) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#0e0e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Plus Jakarta Sans,sans-serif', color: '#a855f7', fontSize: 16, fontWeight: 700, letterSpacing: 2 }}>
-        ⚡ {t.loading}
-      </div>
-    )
-  }
+  if (loadingData) return (
+    <div style={{ minHeight: '100vh', background: '#0e0e16', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Plus Jakarta Sans,sans-serif' }}>
+      <style>{STYLES}</style>
+      <div style={{ color: '#a855f7', fontSize: 20, fontWeight: 700, letterSpacing: 2, marginBottom: 16 }}>⚡ PADELLINK</div>
+      <div style={{ width: 40, height: 40, border: '3px solid rgba(168,85,247,0.2)', borderTopColor: '#a855f7', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  )
 
   return (
-    <div className="app">
-      <style>{STYLES}</style>
+    <ToastCtx.Provider value={showToast}>
+      <ConfirmCtx.Provider value={confirm}>
+        <div className="app">
+          <style>{STYLES}</style>
 
-      <div className="header">
-        <span className="header-logo">PadelLink</span>
-        <div className="header-right">
-          {totalNotifs > 0 && <div className="notif-dot">{totalNotifs}</div>}
-          <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}>{lang === 'fr' ? '🇬🇧 EN' : '🇫🇷 FR'}</button>
-        </div>
-      </div>
-
-      <div className="content">
-        {tab === 'home' && (
-          <HomeTab t={t} lang={lang} me={me} players={players} followedPlayers={followedPlayers}
-            pendingForMe={pendingForMe} myMatches={myMatches} leagues={leagues}
-            leagueMatches={leagueMatches} myAdminLeagues={myAdminLeagues}
-            myLeaveReqs={myLeaveReqs} resolveLeave={resolveLeave}
-            createFreeMatch={createFreeMatch} respondFreeMatch={respondFreeMatch}
-            setViewPlayerId={setViewPlayerId} setTab={setTab}
-          />
-        )}
-        {tab === 'players' && !viewPlayerId && (
-          <PlayersTab t={t} lang={lang} me={me} players={players} follows={follows}
-            ratings={ratings} loadPlayers={loadPlayers} toggleFollow={toggleFollow} isFollowing={isFollowing}
-            submitRating={submitRating} getMyRatingFor={getMyRatingFor}
-            setViewPlayerId={setViewPlayerId}
-          />
-        )}
-        {tab === 'players' && viewPlayerId && (
-          <PlayerProfile t={t} lang={lang} me={me}
-            player={players.find(p => p.id === viewPlayerId)}
-            players={players} follows={follows} ratings={ratings}
-            myMatches={myMatches} leagues={leagues} leagueMatches={leagueMatches}
-            isFollowing={isFollowing} toggleFollow={toggleFollow}
-            submitRating={submitRating} getMyRatingFor={getMyRatingFor}
-            onBack={() => setViewPlayerId(null)}
-          />
-        )}
-        {tab === 'leagues' && !viewLeagueId && !previewLeague && (
-          <LeaguesTab t={t} lang={lang} me={me} leagues={leagues} players={players}
-            createLeague={createLeague} joinLeague={joinLeague}
-            setViewLeagueId={setViewLeagueId} setPreviewLeagueId={setPreviewLeagueId}
-          />
-        )}
-        {tab === 'leagues' && previewLeague && !viewLeagueId && (
-          <LeaguePreview t={t} lang={lang} league={previewLeague} players={players} me={me}
-            joinLeague={joinLeague} setViewLeagueId={setViewLeagueId}
-            setPreviewLeagueId={setPreviewLeagueId}
-          />
-        )}
-        {tab === 'leagues' && activeLeague && (
-          <LeagueView t={t} lang={lang} league={activeLeague} players={players} me={me}
-            leagueMatches={leagueMatches.filter(m => m.league_id === activeLeague.id)}
-            selectedTab={selectedLeagueTab} setSelectedTab={setSelectedLeagueTab}
-            addLeagueMatch={addLeagueMatch} expelMember={expelMember}
-            sendChatMsg={sendChatMsg} toggleSubAdmin={toggleSubAdmin}
-            requestLeave={requestLeave} resolveLeave={resolveLeave}
-            randomDrawTeams={randomDrawTeams} leaveRequests={leaveRequests}
-            onBack={() => { setViewLeagueId(null); setSelectedLeagueTab('ranking2') }}
-            loadLeagues={loadLeagues}
-          />
-        )}
-        {tab === 'ranking' && (
-          <RankingTab t={t} lang={lang} players={players} leagues={leagues}
-            leagueMatches={leagueMatches} follows={follows} ratings={ratings}
-            rankTab={rankTab} setRankTab={setRankTab}
-            setViewPlayerId={setViewPlayerId} setTab={setTab}
-          />
-        )}
-        {tab === 'profile' && (
-          <ProfileTab t={t} lang={lang} me={me} players={players}
-            myRatings={myRatings} myBadges={myBadges} myMatches={myMatches}
-            leagues={leagues} leagueMatches={leagueMatches}
-            updateProfile={updateProfile} uploadPhoto={uploadPhoto}
-            onSignOut={onSignOut}
-          />
-        )}
-      </div>
-
-      <nav className="nav">
-        {[
-          { id: 'home', icon: '🏠', label: t.home },
-          { id: 'players', icon: '👥', label: t.players },
-          { id: 'leagues', icon: '🏆', label: t.leagues },
-          { id: 'ranking', icon: '🌍', label: t.ranking },
-          { id: 'profile', icon: '👤', label: t.profile },
-        ].map(item => (
-          <div key={item.id} className={'nav-item ' + (tab === item.id ? 'active' : '')}
-            onClick={() => { setTab(item.id); setViewPlayerId(null); setViewLeagueId(null); setPreviewLeagueId(null) }}>
-            {item.id === 'home' && totalNotifs > 0 && <div className="nav-badge">{totalNotifs}</div>}
-            <span className="nav-icon">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
+          <div className="header">
+            <span className="header-logo">PadelLink</span>
+            <div className="header-right">
+              {totalNotifs > 0 && <div className="notif-dot">{totalNotifs}</div>}
+              <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}>{lang === 'fr' ? '🇬🇧 EN' : '🇫🇷 FR'}</button>
+            </div>
           </div>
-        ))}
-      </nav>
-    </div>
+
+          <div className="content">
+            {tab === 'home' && (
+              <HomeTab t={t} lang={lang} me={me} players={players} followedPlayers={followedPlayers}
+                pendingForMe={pendingForMe} myMatches={myMatches} leagues={leagues}
+                leagueMatches={leagueMatches} myAdminLeagues={myAdminLeagues}
+                myLeaveReqs={myLeaveReqs} resolveLeave={resolveLeave}
+                createFreeMatch={createFreeMatch} respondFreeMatch={respondFreeMatch}
+                setViewPlayerId={setViewPlayerId} setTab={setTab}
+                loadingBg={loadingBg}
+              />
+            )}
+            {tab === 'players' && !viewPlayerId && (
+              <PlayersTab t={t} lang={lang} me={me} players={players} follows={follows}
+                ratings={ratings} loadPlayers={loadPlayers} toggleFollow={toggleFollow}
+                isFollowing={isFollowing} submitRating={submitRating}
+                getMyRatingFor={getMyRatingFor} setViewPlayerId={setViewPlayerId}
+              />
+            )}
+            {tab === 'players' && viewPlayerId && (
+              <PlayerProfile t={t} lang={lang} me={me}
+                player={players.find(p => p.id === viewPlayerId)}
+                players={players} follows={follows} ratings={ratings}
+                myMatches={myMatches} leagues={leagues} leagueMatches={leagueMatches}
+                isFollowing={isFollowing} toggleFollow={toggleFollow}
+                submitRating={submitRating} getMyRatingFor={getMyRatingFor}
+                onBack={() => setViewPlayerId(null)}
+              />
+            )}
+            {tab === 'leagues' && !viewLeagueId && !previewLeague && (
+              <LeaguesTab t={t} lang={lang} me={me} leagues={leagues} players={players}
+                createLeague={createLeague} joinLeague={joinLeague}
+                setViewLeagueId={setViewLeagueId} setPreviewLeagueId={setPreviewLeagueId}
+              />
+            )}
+            {tab === 'leagues' && previewLeague && !viewLeagueId && (
+              <LeaguePreview t={t} lang={lang} league={previewLeague} players={players} me={me}
+                joinLeague={joinLeague} setViewLeagueId={setViewLeagueId}
+                setPreviewLeagueId={setPreviewLeagueId}
+              />
+            )}
+            {tab === 'leagues' && activeLeague && (
+              <LeagueView t={t} lang={lang} league={activeLeague} players={players} me={me}
+                leagueMatches={leagueMatches.filter(m => m.league_id === activeLeague.id)}
+                selectedTab={selectedLeagueTab} setSelectedTab={setSelectedLeagueTab}
+                addLeagueMatch={addLeagueMatch} expelMember={expelMember}
+                sendChatMsg={sendChatMsg} toggleSubAdmin={toggleSubAdmin}
+                requestLeave={requestLeave} resolveLeave={resolveLeave}
+                randomDrawTeams={randomDrawTeams} leaveRequests={leaveRequests}
+                onBack={() => { setViewLeagueId(null); setSelectedLeagueTab('ranking2') }}
+                loadLeagues={loadLeagues}
+              />
+            )}
+            {tab === 'ranking' && (
+              <RankingTab t={t} lang={lang} players={players} leagues={leagues}
+                leagueMatches={leagueMatches} follows={follows} ratings={ratings}
+                rankTab={rankTab} setRankTab={setRankTab}
+                setViewPlayerId={setViewPlayerId} setTab={setTab}
+              />
+            )}
+            {tab === 'profile' && (
+              <ProfileTab t={t} lang={lang} me={me} players={players}
+                myRatings={myRatings} myBadges={myBadges} myMatches={myMatches}
+                leagues={leagues} leagueMatches={leagueMatches}
+                updateProfile={updateProfile} uploadPhoto={uploadPhoto}
+                onSignOut={onSignOut}
+              />
+            )}
+          </div>
+
+          <nav className="nav">
+            {[
+              { id: 'home', icon: '🏠', label: t.home },
+              { id: 'players', icon: '👥', label: t.players },
+              { id: 'leagues', icon: '🏆', label: t.leagues },
+              { id: 'ranking', icon: '🌍', label: t.ranking },
+              { id: 'profile', icon: '👤', label: t.profile },
+            ].map(item => (
+              <div key={item.id} className={'nav-item ' + (tab === item.id ? 'active' : '')}
+                onClick={() => { setTab(item.id); setViewPlayerId(null); setViewLeagueId(null); setPreviewLeagueId(null) }}>
+                {item.id === 'home' && totalNotifs > 0 && <div className="nav-badge">{totalNotifs}</div>}
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+              </div>
+            ))}
+          </nav>
+
+          <ToastContainer toasts={toasts} />
+          {confirmState && (
+            <ConfirmModal
+              msg={confirmState.msg}
+              confirmLabel={lang === 'en' ? 'Confirm' : 'Confirmer'}
+              cancelLabel={lang === 'en' ? 'Cancel' : 'Annuler'}
+              onConfirm={handleConfirm}
+              onCancel={handleConfirmCancel}
+            />
+          )}
+        </div>
+      </ConfirmCtx.Provider>
+    </ToastCtx.Provider>
   )
 }
 
+
 // ══ HOME ══
-function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatches, leagues, leagueMatches, myAdminLeagues, myLeaveReqs, resolveLeave, createFreeMatch, respondFreeMatch, setViewPlayerId, setTab }) {
-  var [showCreate, setShowCreate] = useState(false)
+function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatches, leagues, leagueMatches, myAdminLeagues, myLeaveReqs, resolveLeave, createFreeMatch, respondFreeMatch, setViewPlayerId, setTab, loadingBg }) {
+  const [showCreate, setShowCreate] = useState(false)
+  const [respondingId, setRespondingId] = useState(null)
+  const [resolvingId, setResolvingId] = useState(null)
+  const showToast = useToast()
+
+  async function handleRespond(matchId, accepted) {
+    if (respondingId) return
+    setRespondingId(matchId + (accepted ? '_y' : '_n'))
+    try {
+      await respondFreeMatch(matchId, accepted)
+      showToast(accepted ? t.matchConfirmed : t.matchRefused, accepted ? 'ok' : 'info')
+    } catch {
+      showToast(t.errorGeneric, 'err')
+    }
+    setRespondingId(null)
+  }
+
+  async function handleResolveLeave(leagueId, playerId, approve) {
+    const key = leagueId + playerId
+    if (resolvingId === key) return
+    setResolvingId(key)
+    try { await resolveLeave(leagueId, playerId, approve) } catch { showToast(t.errorGeneric, 'err') }
+    setResolvingId(null)
+  }
 
   return (
     <div>
       <div className="section-title">👋 {me.name.split(' ')[0]}</div>
 
-      {/* Leave requests for admin */}
       {myLeaveReqs.length > 0 && (
         <div>
           <div style={{ padding: '0 16px 6px', fontSize: 11, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>⚙️ {t.pendingLeaveRequests}</div>
           {myLeaveReqs.map(r => {
-            var p = players.find(x => x.id === r.player_id)
-            var l = myAdminLeagues.find(x => x.id === r.league_id)
+            const p = players.find(x => x.id === r.player_id)
+            const l = myAdminLeagues.find(x => x.id === r.league_id)
+            const key = r.league_id + r.player_id
             return (
               <div key={r.id} className="card card-yellow">
                 <div className="fw600 mb8" style={{ fontSize: 13 }}>{p?.name} → {l?.name}</div>
                 <div className="row gap8">
-                  <button className="btn btn-green btn-sm flex1" onClick={() => resolveLeave(r.league_id, r.player_id, true)}>✓ {t.leaveApprove}</button>
-                  <button className="btn btn-danger btn-sm flex1" onClick={() => resolveLeave(r.league_id, r.player_id, false)}>✕ {t.leaveDecline}</button>
+                  <button className="btn btn-green btn-sm flex1" disabled={resolvingId === key}
+                    onClick={() => handleResolveLeave(r.league_id, r.player_id, true)}>
+                    {resolvingId === key ? <Spin /> : '✓'} {t.leaveApprove}
+                  </button>
+                  <button className="btn btn-danger btn-sm flex1" disabled={resolvingId === key}
+                    onClick={() => handleResolveLeave(r.league_id, r.player_id, false)}>
+                    {resolvingId === key ? <Spin /> : '✕'} {t.leaveDecline}
+                  </button>
                 </div>
               </div>
             )
@@ -833,21 +907,28 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
         </div>
       )}
 
-      {/* Pending match confirmations */}
       {pendingForMe.length > 0 && (
         <div>
           <div style={{ padding: '0 16px 6px', fontSize: 11, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>⏳ {t.pendingMatches}</div>
           {pendingForMe.map(m => {
-            var creator = players.find(p => p.id === m.creator_id)
-            var pids = [m.player1_id, m.player2_id, m.player3_id, m.player4_id]
+            const creator = players.find(p => p.id === m.creator_id)
+            const pids = [m.player1_id, m.player2_id, m.player3_id, m.player4_id]
+            const busyY = respondingId === m.id + '_y'
+            const busyN = respondingId === m.id + '_n'
             return (
               <div key={m.id} className="card card-yellow">
                 <div className="fw600 mb4" style={{ fontSize: 13 }}>{creator?.name} — {t.matchFree}</div>
                 <div className="text-xs mb8">{pids.map(id => players.find(p => p.id === id)?.name || '?').join(', ')}</div>
                 {m.sets?.length > 0 && <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 600, marginBottom: 8 }}>{m.sets.map(s => s.a + '-' + s.b).join('  ')}</div>}
                 <div className="row gap8">
-                  <button className="btn btn-primary btn-sm flex1" onClick={() => respondFreeMatch(m.id, true)}>✓ {t.confirm}</button>
-                  <button className="btn btn-danger btn-sm flex1" onClick={() => respondFreeMatch(m.id, false)}>✕ {t.refuse}</button>
+                  <button className="btn btn-primary btn-sm flex1" disabled={!!respondingId}
+                    onClick={() => handleRespond(m.id, true)}>
+                    {busyY ? <Spin /> : '✓'} {t.confirm}
+                  </button>
+                  <button className="btn btn-danger btn-sm flex1" disabled={!!respondingId}
+                    onClick={() => handleRespond(m.id, false)}>
+                    {busyN ? <Spin /> : '✕'} {t.refuse}
+                  </button>
                 </div>
               </div>
             )
@@ -866,37 +947,35 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
         />
       )}
 
-      {/* Match history */}
       <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches} ({myMatches.length})</div>
-      {myMatches.length === 0 && <div className="empty">{t.noMatches}</div>}
+      {loadingBg && myMatches.length === 0 && (
+        <div>{[1,2,3].map(i => <SkeletonCard key={i} lines={2} />)}</div>
+      )}
+      {!loadingBg && myMatches.length === 0 && <div className="empty">{t.noMatches}</div>}
       {myMatches.slice().reverse().slice(0, 10).map(m => {
-        var isLeagueMatch = !!m.league_id
-        var league = isLeagueMatch ? leagues.find(l => l.id === m.league_id) : null
-        var t1n = '?', t2n = '?'
-        var iWon = false
-
+        const isLeagueMatch = !!m.league_id
+        const league = isLeagueMatch ? leagues.find(l => l.id === m.league_id) : null
+        let t1n = '?', t2n = '?', iWon = false
         if (isLeagueMatch && league) {
-          var tt1 = league.teams?.find(x => x.id === m.team1_id)
-          var tt2 = league.teams?.find(x => x.id === m.team2_id)
+          const tt1 = league.teams?.find(x => x.id === m.team1_id)
+          const tt2 = league.teams?.find(x => x.id === m.team2_id)
           if (tt1) t1n = tt1.name
           if (tt2) t2n = tt2.name
-          var myTeam = league.teams?.find(tm => tm.player1_id === me.id || tm.player2_id === me.id)
+          const myTeam = league.teams?.find(tm => tm.player1_id === me.id || tm.player2_id === me.id)
           if (myTeam && m.winner_id) iWon = myTeam.id === m.winner_id
         } else {
           t1n = [m.player1_id, m.player2_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
           t2n = [m.player3_id, m.player4_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-          var inTeam1 = m.player1_id === me.id || m.player2_id === me.id
+          const inTeam1 = m.player1_id === me.id || m.player2_id === me.id
           if (m.sets?.length) {
-            var w1 = 0, w2 = 0
+            let w1 = 0, w2 = 0
             m.sets.forEach(s => { if (s.a > s.b) w1++; else if (s.b > s.a) w2++ })
             iWon = inTeam1 ? w1 > w2 : w2 > w1
           }
         }
-
-        var hasResult = isLeagueMatch ? !!m.winner_id : m.status === 'confirmed' && m.sets?.length > 0
-        var resultColor = !hasResult ? '#374151' : iWon ? '#10b981' : '#ef4444'
-        var resultLabel = !hasResult ? '🔵 ' + t.matchFree : iWon ? '🏆 ' + t.matchWin : '❌ ' + t.matchLoss
-
+        const hasResult = isLeagueMatch ? !!m.winner_id : m.status === 'confirmed' && m.sets?.length > 0
+        const resultColor = !hasResult ? '#374151' : iWon ? '#10b981' : '#ef4444'
+        const resultLabel = !hasResult ? '🔵 ' + t.matchFree : iWon ? '🏆 ' + t.matchWin : '❌ ' + t.matchLoss
         return (
           <div key={m.id} className="card" style={{ borderLeft: '3px solid ' + resultColor }}>
             <div className="row" style={{ justifyContent: 'space-between', marginBottom: 4 }}>
@@ -914,20 +993,21 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
         )
       })}
 
-      {/* Followed players */}
       <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>👥 {t.followedPlayers}</div>
-      {followedPlayers.length === 0
-        ? <div className="card" style={{ textAlign: 'center' }}><span className="text-sm">{t.noFollowing}</span></div>
-        : followedPlayers.slice(0, 5).map(p => (
-          <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}>
-            <Av size={38} photo={p.photo_url} name={p.name} />
-            <div className="col flex1">
-              <span className="fw600" style={{ fontSize: 13 }}>{p.name}</span>
-              <span className="text-xs">{p.city} · {p.points}pts</span>
+      {loadingBg && followedPlayers.length === 0
+        ? <SkeletonCard lines={1} />
+        : followedPlayers.length === 0
+          ? <div className="card" style={{ textAlign: 'center' }}><span className="text-sm">{t.noFollowing}</span></div>
+          : followedPlayers.slice(0, 5).map(p => (
+            <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}>
+              <Av size={38} photo={p.photo_url} name={p.name} />
+              <div className="col flex1">
+                <span className="fw600" style={{ fontSize: 13 }}>{p.name}</span>
+                <span className="text-xs">{p.city} · {p.points}pts</span>
+              </div>
+              <LvBadge val={p.level} lang={lang} />
             </div>
-            <LvBadge val={p.level} lang={lang} />
-          </div>
-        ))
+          ))
       }
     </div>
   )
@@ -935,46 +1015,52 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
 
 // ══ CREATE MATCH MODAL ══
 function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCreate, onClose }) {
-  var [sel, setSel] = useState([me.id])
-  var [sets, setSets] = useState([{ a: '', b: '' }])
-  var [date, setDate] = useState('')
-  var [leagueId, setLeagueId] = useState('')
-  var [step, setStep] = useState(1)
-  var myLeagues = leagues.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
+  const [sel, setSel] = useState([me.id])
+  const [sets, setSets] = useState([{ a: '', b: '' }])
+  const [date, setDate] = useState('')
+  const [step, setStep] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const showToast = useToast()
+  const myLeagues = leagues.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
 
   function toggleSel(pid) {
     setSel(prev => {
-      var n = prev.slice()
-      var i = n.indexOf(pid)
+      const n = prev.slice()
+      const i = n.indexOf(pid)
       if (i >= 0) n.splice(i, 1)
       else if (n.length < 4) n.push(pid)
       return n
     })
   }
 
-  var ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
-  var t1names = sel.slice(0, 2).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-  var t2names = sel.slice(2, 4).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  const ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
+  const t1names = sel.slice(0, 2).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  const t2names = sel.slice(2, 4).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+  const allSelectable = [me, ...players.filter(p => p.id !== me.id)]
 
-  // Show all players but highlight followed ones
-  var allSelectable = [me, ...players.filter(p => p.id !== me.id)]
+  async function handleCreate() {
+    if (saving) return
+    setSaving(true)
+    try { await onCreate({ playerIds: sel, sets: ps, date }) }
+    catch { showToast(t.errorGeneric, 'err') }
+    setSaving(false)
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">⚡ {t.createMatch}</div>
-
         {step === 1 && (
           <div>
             <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 8 }}>{t.chooseTeams}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4</div>
+            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>{lang === 'fr' ? 'Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4' : 'Team1 = players 1&2 · Team2 = players 3&4'}</div>
             <div style={{ maxHeight: 280, overflowY: 'auto' }}>
               {allSelectable.map(p => {
-                var isSel = sel.includes(p.id)
-                var isMe = p.id === me.id
-                var idx = sel.indexOf(p.id)
-                var teamTag = idx === 0 || idx === 1 ? '🔵 Éq.1' : idx === 2 || idx === 3 ? '🟣 Éq.2' : ''
-                var isFollowed = followedPlayers.some(fp => fp.id === p.id)
+                const isSel = sel.includes(p.id)
+                const isMe = p.id === me.id
+                const idx = sel.indexOf(p.id)
+                const teamTag = idx === 0 || idx === 1 ? '🔵 Éq.1' : idx === 2 || idx === 3 ? '🟣 Éq.2' : ''
+                const isFollowed = followedPlayers.some(fp => fp.id === p.id)
                 return (
                   <div key={p.id} className="row" style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: isMe ? 'default' : 'pointer', opacity: isMe ? 0.5 : 1 }}
                     onClick={isMe ? null : () => toggleSel(p.id)}>
@@ -986,24 +1072,14 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
                 )
               })}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players} · 👥 = joueur suivi</div>
-            {myLeagues.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div className="sub-label">{t.selectLeague}</div>
-                <select className="select" value={leagueId} onChange={e => setLeagueId(e.target.value)}>
-                  <option value="">— {t.matchFree} —</option>
-                  {myLeagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
-            )}
+            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players} · 👥 = {lang === 'fr' ? 'joueur suivi' : 'followed player'}</div>
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <div className="row gap8">
               <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-              <button className="btn btn-primary flex1" disabled={sel.length !== 4} onClick={() => sel.length === 4 && setStep(2)}>Suivant →</button>
+              <button className="btn btn-primary flex1" disabled={sel.length !== 4} onClick={() => sel.length === 4 && setStep(2)}>{lang === 'fr' ? 'Suivant →' : 'Next →'}</button>
             </div>
           </div>
         )}
-
         {step === 2 && (
           <div>
             <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 4 }}>{t.enterSets}</div>
@@ -1015,7 +1091,9 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
             {ps.length > 0 && <SetsPreview sets={ps} t1name={t1names} t2name={t2names} />}
             <div className="row gap8 mt12">
               <button className="btn btn-outline flex1" onClick={() => setStep(1)}>{t.cancelBtn}</button>
-              <button className="btn btn-primary flex1" onClick={() => onCreate({ playerIds: sel, sets: ps, date })}>{t.submitMatch}</button>
+              <button className="btn btn-primary flex1" disabled={saving} onClick={handleCreate}>
+                {saving ? <Spin /> : null} {t.submitMatch}
+              </button>
             </div>
             <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(139,92,246,0.07)', borderRadius: 8, fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>
               ℹ️ {lang === 'fr' ? 'Ce match sera envoyé aux 3 autres joueurs pour confirmation.' : 'This match will be sent to the 3 other players for confirmation.'}
@@ -1029,32 +1107,38 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
 
 // ══ PLAYERS TAB ══
 function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggleFollow, isFollowing, submitRating, getMyRatingFor, setViewPlayerId }) {
-  var [search, setSearch] = useState('')
-  var [page, setPage] = useState(0)
-  var [ratingModal, setRatingModal] = useState(null)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [ratingModal, setRatingModal] = useState(null)
+  const [followingId, setFollowingId] = useState(null)
+  const showToast = useToast()
 
   useEffect(() => {
-    var timer = setTimeout(() => {
-      setPage(0)
-      loadPlayers(search, 0)
-    }, 350)
+    const timer = setTimeout(() => { setPage(0); loadPlayers(search, 0) }, 350)
     return () => clearTimeout(timer)
   }, [search])
 
-  var filtered = players
+  async function handleToggleFollow(p) {
+    if (followingId) return
+    setFollowingId(p.id)
+    try { await toggleFollow(p.id) }
+    catch { showToast(t.errorGeneric, 'err') }
+    setFollowingId(null)
+  }
 
   return (
     <div>
       <div style={{ padding: '12px 16px 8px' }}>
         <input className="input" placeholder={'🔍 ' + t.players + '...'} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-      {filtered.map(p => {
-        var isMe = p.id === me.id
-        var isF = isFollowing(p.id)
-        var info = getLevelInfo(p.level)
-        var lbl = lang === 'en' ? info.labelEn : info.label
-        var pRatings = ratings.filter(r => r.rated_id === p.id)
-        var badges = computeBadges(p, pRatings)
+      {players.map(p => {
+        const isMe = p.id === me.id
+        const isF = isFollowing(p.id)
+        const info = getLevelInfo(p.level)
+        const lbl = lang === 'en' ? info.labelEn : info.label
+        const pRatings = ratings.filter(r => r.rated_id === p.id)
+        const badges = computeBadges(p, pRatings)
+        const busy = followingId === p.id
         return (
           <div key={p.id} className="card">
             <div className="row mb8" style={{ cursor: 'pointer' }} onClick={() => setViewPlayerId(p.id)}>
@@ -1074,8 +1158,9 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
               <span className="text-xs">{p.wins}V · {p.matches}M · {p.points}pts</span>
               {!isMe && (
                 <div className="row gap6">
-                  <button className={'btn btn-sm ' + (isF ? 'btn-danger' : 'btn-outline')} onClick={() => toggleFollow(p.id)}>
-                    {isF ? t.unfollow : t.follow}
+                  <button className={'btn btn-sm ' + (isF ? 'btn-danger' : 'btn-outline')} disabled={busy}
+                    onClick={() => handleToggleFollow(p)}>
+                    {busy ? <Spin /> : (isF ? t.unfollow : t.follow)}
                   </button>
                   <button className="btn btn-sm btn-outline" onClick={() => setRatingModal(p)}>⭐ {t.rate}</button>
                 </div>
@@ -1085,14 +1170,13 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
         )
       })}
       <div style={{ padding: '0 16px 16px' }}>
-        <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { var next = page + 1; setPage(next); loadPlayers(search, next) }}>
-          {lang === 'en' ? 'Load more players' : 'Charger plus de joueurs'}
+        <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { const next = page + 1; setPage(next); loadPlayers(search, next) }}>
+          {lang === 'en' ? 'Load more' : 'Charger plus'}
         </button>
       </div>
       {ratingModal && (
         <RatingModal t={t} lang={lang} target={ratingModal} myExisting={getMyRatingFor(ratingModal.id)}
-          submitRating={submitRating} onClose={() => setRatingModal(null)}
-        />
+          submitRating={submitRating} onClose={() => setRatingModal(null)} />
       )}
     </div>
   )
@@ -1100,30 +1184,37 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
 
 // ══ PLAYER PROFILE ══
 function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatches, leagues, leagueMatches, isFollowing, toggleFollow, submitRating, getMyRatingFor, onBack }) {
-  var [showRating, setShowRating] = useState(false)
-  if (!player) return <div className="empty">Joueur introuvable</div>
+  const [showRating, setShowRating] = useState(false)
+  const [followingBusy, setFollowingBusy] = useState(false)
+  const showToast = useToast()
+  if (!player) return <div className="empty">{lang === 'fr' ? 'Joueur introuvable' : 'Player not found'}</div>
 
-  var isMe = player.id === me.id
-  var isF = isFollowing(player.id)
-  var info = getLevelInfo(player.level)
-  var pRatings = ratings.filter(r => r.rated_id === player.id)
-  var badges = computeBadges(player, pRatings)
-  var rl = RATING_LABELS[lang]
+  const isMe = player.id === me.id
+  const isF = isFollowing(player.id)
+  const info = getLevelInfo(player.level)
+  const pRatings = ratings.filter(r => r.rated_id === player.id)
+  const badges = computeBadges(player, pRatings)
+  const rl = RATING_LABELS[lang]
 
-  var playerMatches = [
-    ...myMatches.filter(m => {
-      if (m.league_id) {
-        var league = leagues.find(l => l.id === m.league_id)
-        return league?.teams?.some(tm => tm.player1_id === player.id || tm.player2_id === player.id)
-      }
-      return [m.player1_id, m.player2_id, m.player3_id, m.player4_id].includes(player.id)
-    })
-  ]
+  const playerMatches = myMatches.filter(m => {
+    if (m.league_id) {
+      const league = leagues.find(l => l.id === m.league_id)
+      return league?.teams?.some(tm => tm.player1_id === player.id || tm.player2_id === player.id)
+    }
+    return [m.player1_id, m.player2_id, m.player3_id, m.player4_id].includes(player.id)
+  })
+
+  async function handleToggleFollow() {
+    if (followingBusy) return
+    setFollowingBusy(true)
+    try { await toggleFollow(player.id) } catch { showToast(t.errorGeneric, 'err') }
+    setFollowingBusy(false)
+  }
 
   return (
     <div>
       <div className="row" style={{ padding: '14px 16px 8px' }}>
-        <button className="btn btn-outline btn-sm" onClick={onBack}>← Retour</button>
+        <button className="btn btn-outline btn-sm" onClick={onBack}>← {lang === 'fr' ? 'Retour' : 'Back'}</button>
         <span className="fw700" style={{ fontSize: 15, marginLeft: 8 }}>{player.name}</span>
       </div>
       <div className="card">
@@ -1138,42 +1229,39 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
         </div>
         {!isMe && (
           <div className="row gap8">
-            <button className={'btn ' + (isF ? 'btn-danger' : 'btn-primary') + ' btn-sm flex1'} onClick={() => toggleFollow(player.id)}>
-              {isF ? t.unfollow : t.follow}
+            <button className={'btn ' + (isF ? 'btn-danger' : 'btn-primary') + ' btn-sm flex1'} disabled={followingBusy} onClick={handleToggleFollow}>
+              {followingBusy ? <Spin /> : (isF ? t.unfollow : t.follow)}
             </button>
             <button className="btn btn-outline btn-sm flex1" onClick={() => setShowRating(true)}>⭐ {t.rate}</button>
           </div>
         )}
       </div>
-
       <div className="grid2" style={{ padding: '0 16px 12px' }}>
         <div className="stat-box"><div className="stat-val">{player.matches}</div><div className="stat-lbl">{t.matches}</div></div>
         <div className="stat-box"><div className="stat-val">{player.wins}</div><div className="stat-lbl">{t.wins}</div></div>
         <div className="stat-box"><div className="stat-val">{player.points}</div><div className="stat-lbl">Points</div></div>
         <div className="stat-box"><div className="stat-val">{player.matches > 0 ? Math.round(player.wins / player.matches * 100) : 0}%</div><div className="stat-lbl">Win%</div></div>
       </div>
-
       <div className="card">
         <div className="fw600 mb8" style={{ fontSize: 12 }}>{t.ratingsTitle}</div>
         {RATING_KEYS.map(key => {
-          var avg = computeRatingAvg(pRatings, key === 'level' ? 'level_rating' : key)
+          const avg = computeRatingAvg(pRatings, key === 'level' ? 'level_rating' : key)
           return (
             <div key={key} className="row mb8" style={{ justifyContent: 'space-between' }}>
               <span className="text-sm">{rl[key]}</span>
-              <Stars val={avg} readOnly={true} />
+              <Stars val={avg} readOnly />
               <span className="text-xs" style={{ marginLeft: 6 }}>{avg > 0 ? avg.toFixed(1) + ' (' + pRatings.length + ')' : '-'}</span>
             </div>
           )
         })}
       </div>
-
       {playerMatches.length > 0 && (
         <div>
           <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches}</div>
           {playerMatches.slice(0, 6).map(m => {
-            var league = m.league_id ? leagues.find(l => l.id === m.league_id) : null
-            var t1n = league ? league.teams?.find(x => x.id === m.team1_id)?.name || 'Éq.1' : [m.player1_id, m.player2_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-            var t2n = league ? league.teams?.find(x => x.id === m.team2_id)?.name || 'Éq.2' : [m.player3_id, m.player4_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+            const league = m.league_id ? leagues.find(l => l.id === m.league_id) : null
+            const t1n = league ? league.teams?.find(x => x.id === m.team1_id)?.name || 'Éq.1' : [m.player1_id, m.player2_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
+            const t2n = league ? league.teams?.find(x => x.id === m.team2_id)?.name || 'Éq.2' : [m.player3_id, m.player4_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
             return (
               <div key={m.id} className="card" style={{ padding: '10px 14px' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{t1n} {t.vs} {t2n}</div>
@@ -1191,11 +1279,9 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
           })}
         </div>
       )}
-
       {showRating && (
         <RatingModal t={t} lang={lang} target={player} myExisting={getMyRatingFor(player.id)}
-          submitRating={submitRating} onClose={() => setShowRating(false)}
-        />
+          submitRating={submitRating} onClose={() => setShowRating(false)} />
       )}
     </div>
   )
@@ -1203,14 +1289,22 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
 
 // ══ RATING MODAL ══
 function RatingModal({ t, lang, target, myExisting, submitRating, onClose }) {
-  var rl = RATING_LABELS[lang]
-  var [ratings, setRatings] = useState({
-    fairplay: myExisting?.fairplay || 0,
-    service: myExisting?.service || 0,
-    reflex: myExisting?.reflex || 0,
-    power: myExisting?.power || 0,
+  const rl = RATING_LABELS[lang]
+  const [ratings, setRatings] = useState({
+    fairplay: myExisting?.fairplay || 0, service: myExisting?.service || 0,
+    reflex: myExisting?.reflex || 0, power: myExisting?.power || 0,
     level: myExisting?.level_rating || 0
   })
+  const [saving, setSaving] = useState(false)
+  const showToast = useToast()
+
+  async function handleSave() {
+    setSaving(true)
+    try { await submitRating(target.id, ratings); showToast(t.saved, 'ok'); onClose() }
+    catch { showToast(t.errorGeneric, 'err') }
+    setSaving(false)
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1223,7 +1317,9 @@ function RatingModal({ t, lang, target, myExisting, submitRating, onClose }) {
         ))}
         <div className="row gap8">
           <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-          <button className="btn btn-primary flex1" onClick={() => { submitRating(target.id, ratings); onClose() }}>{t.saveBtn}</button>
+          <button className="btn btn-primary flex1" disabled={saving} onClick={handleSave}>
+            {saving ? <Spin /> : null} {t.saveBtn}
+          </button>
         </div>
       </div>
     </div>
@@ -1232,12 +1328,13 @@ function RatingModal({ t, lang, target, myExisting, submitRating, onClose }) {
 
 // ══ LEAGUES TAB ══
 function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, setViewLeagueId, setPreviewLeagueId }) {
-  var [showCreate, setShowCreate] = useState(false)
-  var myLeagues = leagues.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
-  var otherLeagues = leagues.filter(l => !l.league_members?.some(lm => lm.player_id === me.id))
+  const [showCreate, setShowCreate] = useState(false)
+  const showToast = useToast()
+  const myLeagues = leagues.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
+  const otherLeagues = leagues.filter(l => !l.league_members?.some(lm => lm.player_id === me.id))
 
   function renderLeague(l) {
-    var isMem = l.league_members?.some(lm => lm.player_id === me.id)
+    const isMem = l.league_members?.some(lm => lm.player_id === me.id)
     return (
       <div key={l.id} className="card card-purple">
         <div style={{ cursor: 'pointer' }} onClick={() => isMem ? setViewLeagueId(l.id) : setPreviewLeagueId(l.id)}>
@@ -1279,12 +1376,11 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
           {otherLeagues.map(renderLeague)}
         </div>
       )}
-      {leagues.length === 0 && <div className="empty">Aucune ligue.<br />Crée la première ! 🎾</div>}
+      {leagues.length === 0 && <div className="empty">{lang === 'fr' ? 'Aucune ligue.\nCrée la première ! 🎾' : 'No leagues yet.\nCreate the first one! 🎾'}</div>}
       {showCreate && (
         <CreateLeagueModal t={t} lang={lang}
-          onCreate={async d => { await createLeague(d); setShowCreate(false) }}
-          onClose={() => setShowCreate(false)}
-        />
+          onCreate={async d => { try { await createLeague(d); setShowCreate(false); showToast(lang === 'fr' ? '✓ Ligue créée !' : '✓ League created!', 'ok') } catch { showToast(t.errorGeneric, 'err') } }}
+          onClose={() => setShowCreate(false)} />
       )}
     </div>
   )
@@ -1292,15 +1388,29 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
 
 // ══ LEAGUE PREVIEW ══
 function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeagueId, setPreviewLeagueId }) {
-  var [code, setCode] = useState('')
-  var [codeError, setCodeError] = useState('')
-  var isMem = league.league_members?.some(lm => lm.player_id === me.id)
-  var admin = players.find(p => p.id === league.admin_id)
+  const [code, setCode] = useState('')
+  const [codeError, setCodeError] = useState('')
+  const [joining, setJoining] = useState(false)
+  const showToast = useToast()
+  const isMem = league.league_members?.some(lm => lm.player_id === me.id)
+  const admin = players.find(p => p.id === league.admin_id)
 
   async function doJoin() {
-    await joinLeague(league.id)
-    setViewLeagueId(league.id)
-    setPreviewLeagueId(null)
+    if (league.is_private) {
+      if (!code.trim()) { setCodeError(t.wrongCode); return }
+    }
+    if (joining) return
+    setJoining(true)
+    setCodeError('')
+    try {
+      await joinLeague(league.id)
+      showToast(t.leagueJoined, 'ok')
+      setViewLeagueId(league.id)
+      setPreviewLeagueId(null)
+    } catch (e) {
+      showToast(e?.message || t.errorGeneric, 'err')
+    }
+    setJoining(false)
   }
 
   return (
@@ -1326,10 +1436,9 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
         )}
         {admin && <div className="text-xs mb4">Admin: {admin.name}</div>}
       </div>
-
       <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.leagueMembers} ({league.league_members?.length || 0})</div>
       {league.league_members?.map(lm => {
-        var p = players.find(x => x.id === lm.player_id)
+        const p = players.find(x => x.id === lm.player_id)
         if (!p) return null
         return (
           <div key={lm.player_id} className="rank-row">
@@ -1342,18 +1451,19 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
           </div>
         )
       })}
-
       {!isMem && (
         <div style={{ padding: '12px 16px' }}>
           {league.is_private && (
             <div style={{ marginBottom: 10 }}>
-              <input className="input" placeholder={t.enterCode + ' (max 10)'} value={code} maxLength={10}
-                onChange={e => setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase())}
-                style={{ marginBottom: 6 }} />
-              {codeError && <div style={{ fontSize: 11, color: '#ef4444' }}>{codeError}</div>}
+              <input className="input" placeholder={t.enterCode} value={code} maxLength={10}
+                onChange={e => { setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()); setCodeError('') }}
+                style={{ marginBottom: codeError ? 6 : 0 }} />
+              {codeError && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>{codeError}</div>}
             </div>
           )}
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={doJoin}>✅ {t.confirmJoin}</button>
+          <button className="btn btn-primary" style={{ width: '100%' }} disabled={joining} onClick={doJoin}>
+            {joining ? <Spin /> : '✅'} {t.confirmJoin}
+          </button>
         </div>
       )}
       {isMem && (
@@ -1369,8 +1479,16 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
 
 // ══ CREATE LEAGUE MODAL ══
 function CreateLeagueModal({ t, lang, onCreate, onClose }) {
-  var [form, setForm] = useState({ name: '', season: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, isPrivate: false, code: '' })
-  var set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const [form, setForm] = useState({ name: '', season: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, isPrivate: false, code: '' })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  async function handleCreate() {
+    if (!form.name.trim() || !form.season.trim()) return
+    setSaving(true)
+    try { await onCreate(form) } finally { setSaving(false) }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
@@ -1383,9 +1501,7 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.setsMatch}</div>
               <select className="select" value={form.setsPerMatch} onChange={e => set('setsPerMatch', parseInt(e.target.value))}>
-                <option value={1}>1 set</option>
-                <option value={3}>Best of 3</option>
-                <option value={5}>Best of 5</option>
+                <option value={1}>1 set</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option>
               </select>
             </div>
             <div style={{ flex: 1 }}>
@@ -1401,14 +1517,16 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
             <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.visibilityLabel}</div>
             <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 10, lineHeight: 1.6 }}>{form.isPrivate ? t.visibilityPrivateDesc : t.visibilityPublicDesc}</div>
             <Toggle on={form.isPrivate} onToggle={() => set('isPrivate', !form.isPrivate)} label={t.privateToggleLabel} />
-            {form.isPrivate && <input className="input" style={{ marginTop: 10 }} placeholder={t.privateCode + ' (max 10 car.)'}
+            {form.isPrivate && <input className="input" style={{ marginTop: 10 }} placeholder={t.privateCode + ' (max 10)'}
               maxLength={10} value={form.code}
               onChange={e => set('code', e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10))} />}
           </div>
         </div>
         <div className="row gap8 mt12">
           <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-          <button className="btn btn-primary flex1" disabled={!form.name || !form.season} onClick={() => { if (form.name && form.season) onCreate(form) }}>{t.create}</button>
+          <button className="btn btn-primary flex1" disabled={!form.name || !form.season || saving} onClick={handleCreate}>
+            {saving ? <Spin /> : null} {t.create}
+          </button>
         </div>
       </div>
     </div>
@@ -1417,14 +1535,17 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
 
 // ══ LEAGUE VIEW ══
 function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, setSelectedTab, addLeagueMatch, expelMember, sendChatMsg, toggleSubAdmin, requestLeave, resolveLeave, randomDrawTeams, leaveRequests, onBack, loadLeagues }) {
-  var isAdmin = league.admin_id === me.id
-  var myRole = league.league_members?.find(lm => lm.player_id === me.id)?.role
-  var isSubAdmin = myRole === 'sub_admin'
-  var canPostScore = isAdmin || isSubAdmin
-  var hasLeaveReq = leaveRequests.some(r => r.league_id === league.id && r.player_id === me.id)
-  var myLeaveReqs = leaveRequests.filter(r => r.league_id === league.id)
+  const isAdmin = league.admin_id === me.id
+  const myRole = league.league_members?.find(lm => lm.player_id === me.id)?.role
+  const isSubAdmin = myRole === 'sub_admin'
+  const canPostScore = isAdmin || isSubAdmin
+  const hasLeaveReq = leaveRequests.some(r => r.league_id === league.id && r.player_id === me.id)
+  const myLeaveReqs = leaveRequests.filter(r => r.league_id === league.id)
+  const [leaveBusy, setLeaveBusy] = useState(false)
+  const showToast = useToast()
+  const confirm = useConfirm()
 
-  var LTABS = [
+  const LTABS = [
     { id: 'ranking2', label: t.ranking2 },
     { id: 'matches', label: t.matches },
     { id: 'teams', label: t.teams },
@@ -1433,7 +1554,7 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
   ]
 
   function computeStandings() {
-    var tbl = {}
+    const tbl = {}
     ;(league.teams || []).forEach(tm => { tbl[tm.id] = { id: tm.id, name: tm.name, P: 0, W: 0, D: 0, PTS: 0 } })
     ;(leagueMatches || []).forEach(m => {
       if (!tbl[m.team1_id]) tbl[m.team1_id] = { id: m.team1_id, name: '?', P: 0, W: 0, D: 0, PTS: 0 }
@@ -1443,6 +1564,15 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
       else { tbl[m.team2_id].W++; tbl[m.team2_id].PTS += 3; tbl[m.team1_id].D++ }
     })
     return Object.values(tbl).sort((a, b) => b.PTS - a.PTS)
+  }
+
+  async function handleLeave() {
+    const ok = await confirm(t.confirmLeave)
+    if (!ok) return
+    setLeaveBusy(true)
+    try { await requestLeave(league.id); showToast(t.leagueLeft, 'info') }
+    catch { showToast(t.errorGeneric, 'err') }
+    setLeaveBusy(false)
   }
 
   return (
@@ -1458,21 +1588,21 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
         {isAdmin && <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>👑 Admin</span>}
         {isSubAdmin && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700 }}>⭐ Sub-admin</span>}
       </div>
-
       {!isAdmin && (
         <div style={{ padding: '0 16px 8px' }}>
           {hasLeaveReq
             ? <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>⏳ {t.leaveRequest}</div>
-            : <button className="btn btn-danger btn-sm" onClick={() => requestLeave(league.id)}>{t.leaveLeague}</button>
+            : <button className="btn btn-danger btn-sm" disabled={leaveBusy} onClick={handleLeave}>
+                {leaveBusy ? <Spin /> : null} {t.leaveLeague}
+              </button>
           }
         </div>
       )}
-
       {isAdmin && myLeaveReqs.length > 0 && (
         <div style={{ margin: '0 16px 8px', padding: '10px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12 }}>
           <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 8 }}>{t.pendingLeaveRequests}</div>
           {myLeaveReqs.map(r => {
-            var p = players.find(x => x.id === r.player_id)
+            const p = players.find(x => x.id === r.player_id)
             return (
               <div key={r.id} className="row" style={{ marginBottom: 6 }}>
                 <span className="flex1" style={{ fontSize: 12 }}>{p?.name}</span>
@@ -1483,11 +1613,9 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
           })}
         </div>
       )}
-
       <div className="tab-bar">
         {LTABS.map(lt => <button key={lt.id} className={'tab-pill ' + (selectedTab === lt.id ? 'active' : '')} onClick={() => setSelectedTab(lt.id)}>{lt.label}</button>)}
       </div>
-
       {selectedTab === 'ranking2' && <LeagueStandings t={t} standings={computeStandings()} />}
       {selectedTab === 'matches' && <LeagueMatchesTab t={t} lang={lang} league={league} players={players} leagueMatches={leagueMatches} addLeagueMatch={addLeagueMatch} canPostScore={canPostScore} />}
       {selectedTab === 'teams' && <LeagueTeamsTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} isSubAdmin={isSubAdmin} randomDrawTeams={randomDrawTeams} loadLeagues={loadLeagues} />}
@@ -1522,28 +1650,27 @@ function LeagueStandings({ t, standings }) {
 }
 
 function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMatch, canPostScore }) {
-  var [t1, setT1] = useState('')
-  var [t2, setT2] = useState('')
-  var [sets, setSets] = useState([{ a: '', b: '' }])
-  var [date, setDate] = useState('')
-  var [saving, setSaving] = useState(false)
-  var [errMsg, setErrMsg] = useState(null)
+  const [t1, setT1] = useState('')
+  const [t2, setT2] = useState('')
+  const [sets, setSets] = useState([{ a: '', b: '' }])
+  const [date, setDate] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [errMsg, setErrMsg] = useState(null)
 
   function getTeamName(id) { return (league.teams || []).find(x => x.id == id)?.name || '?' }
   function getTeamPNames(id) {
-    var tm = (league.teams || []).find(x => x.id == id)
+    const tm = (league.teams || []).find(x => x.id == id)
     if (!tm) return ''
     return [tm.player1_id, tm.player2_id].map(pid => players.find(p => p.id === pid)?.name || '?').join(' & ')
   }
 
-  var ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
+  const ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
 
   async function handleAdd() {
     if (!t1 || !t2 || t1 === t2 || !ps.length) return
     setSaving(true); setErrMsg(null)
-    var tid1 = t1, tid2 = t2
-    var winnerId = matchWinner(tid1, tid2, ps)
-    var err = await addLeagueMatch(league.id, { team1Id: tid1, team2Id: tid2, sets: ps, date, winnerId })
+    const winnerId = matchWinner(t1, t2, ps)
+    const err = await addLeagueMatch(league.id, { team1Id: t1, team2Id: t2, sets: ps, date, winnerId })
     setSaving(false)
     if (err) { setErrMsg(err.message); return }
     setT1(''); setT2(''); setSets([{ a: '', b: '' }]); setDate('')
@@ -1559,9 +1686,9 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
               <select className="select" value={t1} onChange={e => setT1(e.target.value)}>
                 <option value="">{t.team1}</option>
                 {(league.teams || []).map(tm => {
-                  var op1 = players.find(p => p.id === tm.player1_id)
-                  var op2 = players.find(p => p.id === tm.player2_id)
-                  var avg = op1 && op2 ? ((op1.level + op2.level) / 2).toFixed(1) : ''
+                  const op1 = players.find(p => p.id === tm.player1_id)
+                  const op2 = players.find(p => p.id === tm.player2_id)
+                  const avg = op1 && op2 ? ((op1.level + op2.level) / 2).toFixed(1) : ''
                   return <option key={tm.id} value={tm.id}>{tm.name}{avg ? ' (moy.' + avg + ')' : ''}</option>
                 })}
               </select>
@@ -1581,7 +1708,9 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
           {t1 && t2 && ps.length > 0 && <SetsPreview sets={ps} t1name={getTeamName(t1)} t2name={getTeamName(t2)} />}
           <input className="input mb8 mt8" type="date" value={date} onChange={e => setDate(e.target.value)} />
           {errMsg && <div style={{ fontSize: 11, color: '#ef4444', marginBottom: 8 }}>{errMsg}</div>}
-          <button className="btn btn-primary" style={{ width: '100%' }} disabled={saving} onClick={handleAdd}>{saving ? '⏳...' : t.addTeamMatch}</button>
+          <button className="btn btn-primary" style={{ width: '100%' }} disabled={saving || !t1 || !t2 || t1 === t2 || !ps.length} onClick={handleAdd}>
+            {saving ? <Spin /> : null} {t.addTeamMatch}
+          </button>
         </div>
       ) : (
         <div className="card mt8" style={{ textAlign: 'center' }}>
@@ -1591,8 +1720,8 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
       )}
       {leagueMatches.length === 0 && <div className="empty">{t.noMatchYet}</div>}
       {leagueMatches.slice().reverse().map(m => {
-        var t1n = getTeamName(m.team1_id), t2n = getTeamName(m.team2_id)
-        var w = (league.teams || []).find(x => x.id === m.winner_id)
+        const t1n = getTeamName(m.team1_id), t2n = getTeamName(m.team2_id)
+        const w = (league.teams || []).find(x => x.id === m.winner_id)
         return (
           <div key={m.id} className="card">
             <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1611,59 +1740,75 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
 }
 
 function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomDrawTeams, loadLeagues }) {
-  var canEdit = isAdmin || isSubAdmin
-  var [editId, setEditId] = useState(null)
-  var [eName, setEName] = useState('')
-  var [eP1, setEP1] = useState('')
-  var [eP2, setEP2] = useState('')
-  var [saving, setSaving] = useState(false)
-  var leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
-  var leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
+  const canEdit = isAdmin || isSubAdmin
+  const [editId, setEditId] = useState(null)
+  const [eName, setEName] = useState('')
+  const [eP1, setEP1] = useState('')
+  const [eP2, setEP2] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [drawing, setDrawing] = useState(false)
+  const [balancing, setBalancing] = useState(false)
+  const showToast = useToast()
+  const confirm = useConfirm()
+  const leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
+  const leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
 
   async function saveTeamEdit() {
     setSaving(true)
     await supabase.from('teams').update({ name: eName, player1_id: eP1 || null, player2_id: eP2 || null }).eq('id', editId)
-    await loadLeagues()
+    await loadLeagues(0)
     setEditId(null)
     setSaving(false)
+    showToast(t.saved, 'ok')
   }
 
-  async function handleDraw() { await randomDrawTeams(league.id) }
+  async function handleDraw() {
+    const ok = await confirm(t.confirmDraw)
+    if (!ok) return
+    setDrawing(true)
+    try { await randomDrawTeams(league.id); showToast(lang === 'fr' ? '🎲 Tirage effectué !' : '🎲 Draw done!', 'ok') }
+    catch { showToast(t.errorGeneric, 'err') }
+    setDrawing(false)
+  }
 
-  async function balanceTeams() {
-    var sorted = leaguePlayers.slice().sort((a, b) => b.level - a.level)
-    var existing = league.teams || []
-    for (var tm of existing) { await supabase.from('teams').delete().eq('id', tm.id) }
-    var half = Math.floor(sorted.length / 2)
-    var team1 = sorted.filter((_, i) => i % 2 === 0)
-    var team2 = sorted.filter((_, i) => i % 2 === 1)
-    if (team1.length > 0) await supabase.from('teams').insert({ league_id: league.id, name: lang === 'en' ? 'Team 1' : 'Équipe 1', player1_id: team1[0]?.id || null, player2_id: team1[1]?.id || null })
-    if (team2.length > 0) await supabase.from('teams').insert({ league_id: league.id, name: lang === 'en' ? 'Team 2' : 'Équipe 2', player1_id: team2[0]?.id || null, player2_id: team2[1]?.id || null })
-    await loadLeagues()
+  async function handleBalance() {
+    const ok = await confirm(t.confirmBalance)
+    if (!ok) return
+    setBalancing(true)
+    try {
+      const sorted = leaguePlayers.slice().sort((a, b) => b.level - a.level)
+      for (const tm of (league.teams || [])) { await supabase.from('teams').delete().eq('id', tm.id) }
+      const team1 = sorted.filter((_, i) => i % 2 === 0)
+      const team2 = sorted.filter((_, i) => i % 2 === 1)
+      if (team1.length) await supabase.from('teams').insert({ league_id: league.id, name: lang === 'en' ? 'Team 1' : 'Équipe 1', player1_id: team1[0]?.id || null, player2_id: team1[1]?.id || null })
+      if (team2.length) await supabase.from('teams').insert({ league_id: league.id, name: lang === 'en' ? 'Team 2' : 'Équipe 2', player1_id: team2[0]?.id || null, player2_id: team2[1]?.id || null })
+      await loadLeagues(0)
+      showToast(lang === 'fr' ? '⚖️ Équipes équilibrées !' : '⚖️ Teams balanced!', 'ok')
+    } catch { showToast(t.errorGeneric, 'err') }
+    setBalancing(false)
   }
 
   function teamAvg(tm) {
-    var p1 = players.find(p => p.id === tm.player1_id)
-    var p2 = players.find(p => p.id === tm.player2_id)
-    var lvls = [p1?.level, p2?.level].filter(Boolean)
-    if (!lvls.length) return null
-    return (lvls.reduce((a, b) => a + b, 0) / lvls.length).toFixed(1)
+    const lvls = [players.find(p => p.id === tm.player1_id)?.level, players.find(p => p.id === tm.player2_id)?.level].filter(Boolean)
+    return lvls.length ? (lvls.reduce((a, b) => a + b, 0) / lvls.length).toFixed(1) : null
   }
 
   return (
     <div style={{ padding: '0 16px' }}>
       {canEdit && (
         <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 12 }}>
-          <button className="btn btn-outline flex1" onClick={handleDraw}>🎲 {t.randomDraw}</button>
-          <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} onClick={balanceTeams}>⚖️ {lang === 'fr' ? 'Équilibrer' : 'Balance'}</button>
+          <button className="btn btn-outline flex1" disabled={drawing} onClick={handleDraw}>{drawing ? <Spin /> : '🎲'} {t.randomDraw}</button>
+          <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={balancing} onClick={handleBalance}>
+            {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : 'Balance'}
+          </button>
         </div>
       )}
       {(league.teams || []).length === 0 && <div className="empty">{lang === 'en' ? 'No teams yet.' : 'Aucune équipe.'}</div>}
       {(league.teams || []).map(tm => {
-        var p1 = players.find(p => p.id === tm.player1_id)
-        var p2 = players.find(p => p.id === tm.player2_id)
-        var isEd = editId === tm.id
-        var avg = teamAvg(tm)
+        const p1 = players.find(p => p.id === tm.player1_id)
+        const p2 = players.find(p => p.id === tm.player2_id)
+        const isEd = editId === tm.id
+        const avg = teamAvg(tm)
         return (
           <div key={tm.id} className="card mb8">
             {isEd ? (
@@ -1679,7 +1824,7 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
                 </select>
                 <div className="row gap8">
                   <button className="btn btn-outline flex1" onClick={() => setEditId(null)}>{t.cancelBtn}</button>
-                  <button className="btn btn-primary flex1" disabled={saving} onClick={saveTeamEdit}>{saving ? '⏳' : t.saveBtn}</button>
+                  <button className="btn btn-primary flex1" disabled={saving} onClick={saveTeamEdit}>{saving ? <Spin /> : t.saveBtn}</button>
                 </div>
               </div>
             ) : (
@@ -1704,13 +1849,36 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
 }
 
 function LeagueMembersTab({ t, lang, league, players, isAdmin, expelMember, toggleSubAdmin, me }) {
+  const [expellingId, setExpellingId] = useState(null)
+  const [subAdminBusy, setSubAdminBusy] = useState(null)
+  const showToast = useToast()
+  const confirm = useConfirm()
+
+  async function handleExpel(playerId, playerName) {
+    const ok = await confirm(t.confirmExpel + ' (' + playerName + ')')
+    if (!ok) return
+    setExpellingId(playerId)
+    try { await expelMember(league.id, playerId); showToast(lang === 'fr' ? 'Joueur expulsé' : 'Player expelled', 'ok') }
+    catch { showToast(t.errorGeneric, 'err') }
+    setExpellingId(null)
+  }
+
+  async function handleToggleSub(playerId) {
+    setSubAdminBusy(playerId)
+    try { await toggleSubAdmin(league.id, playerId) }
+    catch { showToast(t.errorGeneric, 'err') }
+    setSubAdminBusy(null)
+  }
+
   return (
     <div style={{ padding: '0 16px' }}>
       {(league.league_members || []).map(lm => {
-        var p = players.find(x => x.id === lm.player_id)
+        const p = players.find(x => x.id === lm.player_id)
         if (!p) return null
-        var isAdm = lm.role === 'admin'
-        var isSub = lm.role === 'sub_admin'
+        const isAdm = lm.role === 'admin'
+        const isSub = lm.role === 'sub_admin'
+        const busyExp = expellingId === lm.player_id
+        const busySub = subAdminBusy === lm.player_id
         return (
           <div key={lm.player_id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div className="row">
@@ -1722,10 +1890,13 @@ function LeagueMembersTab({ t, lang, league, players, isAdmin, expelMember, togg
               {isAdmin && !isAdm && (
                 <div className="row gap4">
                   <button className={'btn btn-sm ' + (isSub ? 'btn-yellow' : 'btn-outline')} style={{ fontSize: 10 }}
-                    onClick={() => toggleSubAdmin(league.id, lm.player_id)}>
-                    {isSub ? '⭐ ' + t.removeSubAdmin : '⭐ ' + t.addSubAdmin}
+                    disabled={busySub} onClick={() => handleToggleSub(lm.player_id)}>
+                    {busySub ? <Spin /> : '⭐'} {isSub ? t.removeSubAdmin : t.addSubAdmin}
                   </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => expelMember(league.id, lm.player_id)}>{t.expel}</button>
+                  <button className="btn btn-danger btn-sm" disabled={busyExp}
+                    onClick={() => handleExpel(lm.player_id, p.name)}>
+                    {busyExp ? <Spin /> : t.expel}
+                  </button>
                 </div>
               )}
             </div>
@@ -1737,37 +1908,36 @@ function LeagueMembersTab({ t, lang, league, players, isAdmin, expelMember, togg
 }
 
 function LeagueChatTab({ t, league, players, me, sendChatMsg }) {
-  var [msg, setMsg] = useState('')
-  var [messages, setMessages] = useState([])
-  var [loading, setLoading] = useState(true)
-  var chatEndRef = useRef(null)
+  const [msg, setMsg] = useState('')
+  const [messages, setMessages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const chatEndRef = useRef(null)
 
   useEffect(() => {
     loadMessages()
-    var channel = supabase
-      .channel('chat:' + league.id)
+    const channel = supabase.channel('chat:' + league.id)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: 'league_id=eq.' + league.id }, payload => {
         setMessages(prev => [...prev, payload.new])
-      })
-      .subscribe()
+      }).subscribe()
     return () => supabase.removeChannel(channel)
   }, [league.id])
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length])
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages.length])
 
   async function loadMessages() {
-    var { data } = await supabase.from('chat_messages').select('*').eq('league_id', league.id).order('created_at', { ascending: true }).limit(100)
+    const { data } = await supabase.from('chat_messages').select('*').eq('league_id', league.id).order('created_at', { ascending: true }).limit(100)
     if (data) setMessages(data)
     setLoading(false)
   }
 
   async function handleSend() {
-    var clean = msg.trim().slice(0, 500)
-    if (!clean) return
+    const clean = msg.trim().slice(0, 500)
+    if (!clean || sending) return
+    setSending(true)
     await sendChatMsg(league.id, clean)
     setMsg('')
+    setSending(false)
   }
 
   return (
@@ -1775,8 +1945,8 @@ function LeagueChatTab({ t, league, players, me, sendChatMsg }) {
       <div style={{ padding: '10px 16px', minHeight: 200, maxHeight: 380, overflowY: 'auto' }}>
         {loading && <div className="loading-screen">{t.loading}</div>}
         {messages.map(c => {
-          var isMe = c.player_id === me.id
-          var sender = players.find(p => p.id === c.player_id)
+          const isMe = c.player_id === me.id
+          const sender = players.find(p => p.id === c.player_id)
           return (
             <div key={c.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
               {!isMe && <span style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>{sender?.name || '?'}</span>}
@@ -1790,8 +1960,10 @@ function LeagueChatTab({ t, league, players, me, sendChatMsg }) {
       <div className="chat-input-row">
         <input className="input flex1" placeholder={t.message} value={msg} maxLength={500}
           onChange={e => setMsg(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()} />
-        <button className="btn btn-primary btn-sm" onClick={handleSend}>{t.send}</button>
+          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()} />
+        <button className="btn btn-primary btn-sm" disabled={sending || !msg.trim()} onClick={handleSend}>
+          {sending ? <Spin /> : t.send}
+        </button>
       </div>
     </div>
   )
@@ -1799,12 +1971,12 @@ function LeagueChatTab({ t, league, players, me, sendChatMsg }) {
 
 // ══ RANKING ══
 function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings, rankTab, setRankTab, setViewPlayerId, setTab }) {
-  var sorted = [...players].sort((a, b) => b.points - a.points)
+  const sorted = [...players].sort((a, b) => b.points - a.points)
 
   function formColor(h) {
     if (!h?.length) return '#6b7280'
-    var last = h.slice(-5)
-    var wr = last.filter(x => x === 1).length / last.length
+    const last = h.slice(-5)
+    const wr = last.filter(x => x === 1).length / last.length
     return wr >= 0.6 ? '#10b981' : wr >= 0.4 ? '#f59e0b' : '#ef4444'
   }
 
@@ -1815,15 +1987,14 @@ function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings
         <button className={'tab-pill ' + (rankTab === 'world' ? 'active' : '')} onClick={() => setRankTab('world')}>{t.worldRank}</button>
         <button className={'tab-pill ' + (rankTab === 'league' ? 'active' : '')} onClick={() => setRankTab('league')}>{t.leagueRank}</button>
       </div>
-
       {rankTab === 'world' && (
         <div>
           {sorted.map((p, idx) => {
-            var info = getLevelInfo(p.level)
-            var lbl = lang === 'en' ? info.labelEn : info.label
-            var nc = 'rank-num' + (idx === 0 ? ' top1' : idx === 1 ? ' top2' : idx === 2 ? ' top3' : '')
-            var pRatings = ratings.filter(r => r.rated_id === p.id)
-            var badges = computeBadges(p, pRatings)
+            const info = getLevelInfo(p.level)
+            const lbl = lang === 'en' ? info.labelEn : info.label
+            const nc = 'rank-num' + (idx === 0 ? ' top1' : idx === 1 ? ' top2' : idx === 2 ? ' top3' : '')
+            const pRatings = ratings.filter(r => r.rated_id === p.id)
+            const badges = computeBadges(p, pRatings)
             return (
               <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}>
                 <div className={nc}>{idx + 1}</div>
@@ -1850,11 +2021,10 @@ function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings
           </div>
         </div>
       )}
-
       {rankTab === 'league' && (
         <div>
           {leagues.map(l => {
-            var tbl = {}
+            const tbl = {}
             ;(l.teams || []).forEach(tm => { tbl[tm.id] = { id: tm.id, name: tm.name, P: 0, W: 0, D: 0, PTS: 0 } })
             leagueMatches.filter(m => m.league_id === l.id).forEach(m => {
               if (!tbl[m.team1_id]) tbl[m.team1_id] = { id: m.team1_id, name: '?', P: 0, W: 0, D: 0, PTS: 0 }
@@ -1863,7 +2033,7 @@ function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings
               if (m.winner_id === m.team1_id) { tbl[m.team1_id].W++; tbl[m.team1_id].PTS += 3; tbl[m.team2_id].D++ }
               else { tbl[m.team2_id].W++; tbl[m.team2_id].PTS += 3; tbl[m.team1_id].D++ }
             })
-            var rows = Object.values(tbl).sort((a, b) => b.PTS - a.PTS)
+            const rows = Object.values(tbl).sort((a, b) => b.PTS - a.PTS)
             return (
               <div key={l.id} style={{ marginBottom: 16 }}>
                 <div style={{ padding: '8px 16px', fontSize: 13, fontWeight: 700, color: '#a855f7' }}>{l.is_private ? '🔒 ' : '🌍 '}{l.name}</div>
@@ -1885,49 +2055,73 @@ function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings
 
 // ══ PROFILE ══
 function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leagues, leagueMatches, updateProfile, uploadPhoto, onSignOut }) {
-  var [editing, setEditing] = useState(false)
-  var [eName, setEName] = useState(me.name)
-  var [eCity, setECity] = useState(me.city)
-  var [eLevel, setELevel] = useState(me.level)
-  var [showLv, setShowLv] = useState(false)
-  var [showBd, setShowBd] = useState(false)
-  var fileRef = useRef(null)
-  var info = getLevelInfo(me.level)
-  var lbl = lang === 'en' ? info.labelEn : info.label
-  var rl = RATING_LABELS[lang]
+  const [editing, setEditing] = useState(false)
+  const [eName, setEName] = useState(me.name)
+  const [eCity, setECity] = useState(me.city)
+  const [eLevel, setELevel] = useState(me.level)
+  const [showLv, setShowLv] = useState(false)
+  const [showBd, setShowBd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
+  const showToast = useToast()
+  const confirm = useConfirm()
+  const info = getLevelInfo(me.level)
+  const lbl = lang === 'en' ? info.labelEn : info.label
+  const rl = RATING_LABELS[lang]
 
-  // SVG points graph
-  var n = Math.min(myMatches.length, 10)
-  var SVG_W = 300, SVG_H = 80
-  var cumPts = 0
-  var ptsSeries = []
-  for (var i = 0; i < n; i++) {
+  const n = Math.min(myMatches.length, 10)
+  const SVG_W = 300, SVG_H = 80
+  let cumPts = 0
+  const ptsSeries = []
+  for (let i = 0; i < n; i++) {
     cumPts += me.points / Math.max(me.matches, 1)
     ptsSeries.push(Math.round(cumPts))
   }
-  var maxP = Math.max(...ptsSeries, 1)
-  var sx = i2 => n <= 1 ? SVG_W / 2 : 20 + i2 * (SVG_W - 40) / (n - 1)
-  var sy = v => SVG_H - 8 - (v / maxP) * (SVG_H - 16)
-  var pPath = n > 0 ? ptsSeries.map((v, i2) => (i2 === 0 ? 'M' : 'L') + sx(i2) + ',' + sy(v)).join(' ') : ''
+  const maxP = Math.max(...ptsSeries, 1)
+  const sx = i2 => n <= 1 ? SVG_W / 2 : 20 + i2 * (SVG_W - 40) / (n - 1)
+  const sy = v => SVG_H - 8 - (v / maxP) * (SVG_H - 16)
+  const pPath = n > 0 ? ptsSeries.map((v, i2) => (i2 === 0 ? 'M' : 'L') + sx(i2) + ',' + sy(v)).join(' ') : ''
 
   async function save() {
-    await updateProfile({ name: eName.trim().slice(0, 50), city: eCity.trim().slice(0, 50), level: eLevel })
-    setEditing(false)
+    if (!eName.trim() || eName.trim().length < 2) { showToast(t.nameRequired, 'err'); return }
+    if (!eCity.trim()) { showToast(t.cityRequired, 'err'); return }
+    setSaving(true)
+    try {
+      await updateProfile({ name: eName.trim().slice(0, 50), city: eCity.trim().slice(0, 50), level: eLevel })
+      showToast(t.profileUpdated, 'ok')
+      setEditing(false)
+    } catch { showToast(t.errorGeneric, 'err') }
+    setSaving(false)
+  }
+
+  async function handleUpload(file) {
+    setUploading(true)
+    try { await uploadPhoto(file); showToast(lang === 'fr' ? '✓ Photo mise à jour !' : '✓ Photo updated!', 'ok') }
+    catch { showToast(t.errorGeneric, 'err') }
+    setUploading(false)
+  }
+
+  async function handleSignOut() {
+    const ok = await confirm(t.confirmSignOut)
+    if (ok) onSignOut()
   }
 
   return (
     <div>
       <div style={{ padding: '14px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="section-title" style={{ padding: 0 }}>{t.profile}</div>
-        <button className="btn btn-danger btn-sm" onClick={onSignOut}>{t.signOut}</button>
+        <button className="btn btn-danger btn-sm" onClick={handleSignOut}>{t.signOut}</button>
       </div>
 
       <div className="card mt8">
         <div className="row mb12">
-          <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => fileRef.current?.click()}>
+          <div style={{ position: 'relative', cursor: uploading ? 'wait' : 'pointer' }} onClick={() => !uploading && fileRef.current?.click()}>
             <Av size={64} photo={me.photo_url} name={me.name} />
-            <div style={{ position: 'absolute', bottom: 0, right: 0, background: '#7c3aed', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📷</div>
-            <input type="file" accept="image/*" ref={fileRef} style={{ display: 'none' }} onChange={e => { var f = e.target.files[0]; if (f) uploadPhoto(f) }} />
+            <div style={{ position: 'absolute', bottom: 0, right: 0, background: uploading ? '#374151' : '#7c3aed', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+              {uploading ? <Spin /> : '📷'}
+            </div>
+            <input type="file" accept="image/*" ref={fileRef} style={{ display: 'none' }} onChange={e => { const f = e.target.files[0]; if (f) handleUpload(f) }} />
           </div>
           {!editing ? (
             <div className="col flex1">
@@ -1949,7 +2143,9 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
         {editing ? (
           <div className="row gap8">
             <button className="btn btn-outline flex1" onClick={() => setEditing(false)}>{t.cancelBtn}</button>
-            <button className="btn btn-primary flex1" onClick={save}>{t.saveBtn}</button>
+            <button className="btn btn-primary flex1" disabled={saving} onClick={save}>
+              {saving ? <Spin /> : null} {t.saveBtn}
+            </button>
           </div>
         ) : (
           <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { setEName(me.name); setECity(me.city); setELevel(me.level); setEditing(true) }}>✏️ {t.editProfile}</button>
@@ -1967,12 +2163,7 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
         <div className="card">
           <div className="fw600 mb8" style={{ fontSize: 12 }}>{t.pointsHistory}</div>
           <svg width={SVG_W} height={SVG_H} style={{ display: 'block', margin: '0 auto' }}>
-            <defs>
-              <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
-              </linearGradient>
-            </defs>
+            <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#7c3aed" stopOpacity="0.4" /><stop offset="100%" stopColor="#7c3aed" stopOpacity="0" /></linearGradient></defs>
             <path d={pPath + ' L' + sx(n - 1) + ',' + SVG_H + ' L' + sx(0) + ',' + SVG_H + ' Z'} fill="url(#pg)" />
             <path d={pPath} fill="none" stroke="#a855f7" strokeWidth={2} strokeLinecap="round" />
           </svg>
@@ -1994,11 +2185,11 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
       <div className="card">
         <div className="fw600 mb8" style={{ fontSize: 12 }}>{t.ratingsTitle}</div>
         {RATING_KEYS.map(key => {
-          var avg = computeRatingAvg(myRatings, key === 'level' ? 'level_rating' : key)
+          const avg = computeRatingAvg(myRatings, key === 'level' ? 'level_rating' : key)
           return (
             <div key={key} className="row mb8" style={{ justifyContent: 'space-between' }}>
               <span className="text-sm">{rl[key]}</span>
-              <Stars val={avg} readOnly={true} />
+              <Stars val={avg} readOnly />
               <span className="text-xs" style={{ marginLeft: 6 }}>{avg > 0 ? avg.toFixed(1) + ' (' + myRatings.length + ')' : '-'}</span>
             </div>
           )
@@ -2013,8 +2204,8 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
       {showLv && (
         <div className="card">
           {LEVELS.map(lv => {
-            var ll = lang === 'en' ? lv.labelEn : lv.label
-            var ld = lang === 'en' ? lv.descEn : lv.desc
+            const ll = lang === 'en' ? lv.labelEn : lv.label
+            const ld = lang === 'en' ? lv.descEn : lv.desc
             return (
               <div key={lv.val} className="row mb8" style={{ opacity: me.level === lv.val ? 1 : 0.45 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: lv.color, display: 'inline-block', flexShrink: 0 }} />
@@ -2032,9 +2223,9 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
         <div className="card">
           <div className="fw600 mb8" style={{ fontSize: 12 }}>{t.badges}</div>
           {BADGE_DEFS.map(item => {
-            var has = myBadges.includes(item.b)
-            var bl = lang === 'en' ? item.en : item.fr
-            var bd = lang === 'en' ? item.dEn : item.dFr
+            const has = myBadges.includes(item.b)
+            const bl = lang === 'en' ? item.en : item.fr
+            const bd = lang === 'en' ? item.dEn : item.dFr
             return (
               <div key={item.b} className="row mb8" style={{ opacity: has ? 1 : 0.35 }}>
                 <span style={{ fontSize: 20, marginRight: 8 }}>{item.b}</span>
@@ -2048,6 +2239,7 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
           })}
         </div>
       )}
+      <div style={{ height: 16 }} />
     </div>
   )
 }

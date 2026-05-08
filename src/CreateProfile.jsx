@@ -55,7 +55,6 @@ const T = {
 }
 
 const STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Plus Jakarta Sans',sans-serif;background:#0a0a0f;color:#fff;}
   .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0e0e16;padding:24px;}
@@ -84,32 +83,30 @@ const STYLES = `
 `
 
 export default function CreateProfile({ session, onCreated }) {
-  var [lang, setLang] = useState('fr')
-  var [name, setName] = useState(
-    session.user.user_metadata?.name || ''
-  )
-  var [city, setCity] = useState('')
-  var [dob, setDob] = useState('')
-  var [level, setLevel] = useState(2.0)
-  var [loading, setLoading] = useState(false)
-  var [error, setError] = useState(null)
+  const [lang, setLang] = useState('fr')
+  const [name, setName] = useState(session.user.user_metadata?.name || '')
+  const [city, setCity] = useState('')
+  const [dob, setDob] = useState('')
+  const [level, setLevel] = useState(2.0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  var t = T[lang]
-  var selectedLevel = LEVELS.find(function(l) { return l.val === level }) || LEVELS[2]
-  var selectedLevelLabel = lang === 'en' ? selectedLevel.labelEn : selectedLevel.label
-  var selectedLevelDesc = lang === 'en' ? selectedLevel.descEn : selectedLevel.desc
+  const t = T[lang]
+  const selectedLevel = LEVELS.find(l => l.val === level) || LEVELS[2]
+  const selectedLevelLabel = lang === 'en' ? selectedLevel.labelEn : selectedLevel.label
+  const selectedLevelDesc = lang === 'en' ? selectedLevel.descEn : selectedLevel.desc
 
   function calcAge(dobStr) {
     if (!dobStr) return null
-    var today = new Date()
-    var birth = new Date(dobStr)
-    var age = today.getFullYear() - birth.getFullYear()
-    var m = today.getMonth() - birth.getMonth()
+    const today = new Date()
+    const birth = new Date(dobStr)
+    let age = today.getFullYear() - birth.getFullYear()
+    const m = today.getMonth() - birth.getMonth()
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
     return age
   }
 
-  var currentAge = calcAge(dob)
+  const currentAge = calcAge(dob)
 
   async function handleSubmit() {
     if (!name.trim() || name.trim().length < 2) {
@@ -132,12 +129,7 @@ export default function CreateProfile({ session, onCreated }) {
     setLoading(true)
     setError(null)
 
-    var { data: authData } = await supabase.auth.getUser()
-    console.log('USER:', authData?.user)
-    console.log('USER ID:', authData?.user?.id)
-    console.log('SESSION ID:', session?.user?.id)
-
-    var { error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('players')
       .insert({
         user_id: session.user.id,

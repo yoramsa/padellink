@@ -5,14 +5,14 @@ import CreateProfile from './CreateProfile'
 import PadelLink from './PadelLink'
 
 export default function App() {
-  var [session, setSession] = useState(null)
-  var [player, setPlayer] = useState(null)
-  var [loading, setLoading] = useState(true)
-  var [pendingLeagueId, setPendingLeagueId] = useState(null)
+  const [session, setSession] = useState(null)
+  const [player, setPlayer] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [pendingLeagueId, setPendingLeagueId] = useState(null)
 
   useEffect(function() {
-    var params = new URLSearchParams(window.location.search)
-    var leagueParam = params.get('league')
+    const params = new URLSearchParams(window.location.search)
+    const leagueParam = params.get('league')
     if (leagueParam) {
       setPendingLeagueId(leagueParam)
       window.history.replaceState({}, '', window.location.pathname)
@@ -24,7 +24,7 @@ export default function App() {
       else setLoading(false)
     })
 
-    var listener = supabase.auth.onAuthStateChange(function(event, sess) {
+    const listener = supabase.auth.onAuthStateChange(function(event, sess) {
       setSession(sess)
       if (sess) loadPlayer(sess.user.id)
       else { setPlayer(null); setLoading(false) }
@@ -35,7 +35,7 @@ export default function App() {
 
   async function loadPlayer(userId) {
     setLoading(true)
-    var { data } = await supabase.from('players').select('*').eq('user_id', userId).single()
+    const { data } = await supabase.from('players').select('*').eq('user_id', userId).single()
     setPlayer(data || null)
     setLoading(false)
   }
