@@ -144,15 +144,15 @@ function Spin() { return <span className="spin" /> }
 
 // ── Level definitions ──
 const LEVELS = [
-  {val:1.0,label:'Débutant',labelEn:'Beginner',color:'#6b7280',desc:'Débute le padel, apprentissage des bases.',descEn:'Just starting padel, learning the basics.'},
-  {val:1.5,label:'Débutant+',labelEn:'Beginner+',color:'#9ca3af',desc:'Connait les règles, quelques échanges.',descEn:'Knows the rules, can rally.'},
-  {val:2.0,label:'Intermédiaire',labelEn:'Intermediate',color:'#3b82f6',desc:'Régularité, coups de base maîtrisés.',descEn:'Consistency, basic shots mastered.'},
-  {val:2.5,label:'Intermédiaire+',labelEn:'Intermediate+',color:'#06b6d4',desc:'Bonne lecture du jeu, tactique simple.',descEn:'Good game reading, simple tactics.'},
-  {val:3.0,label:'Confirmé',labelEn:'Confirmed',color:'#10b981',desc:'Maîtrise du mur, variations de jeu.',descEn:'Wall control, game variations.'},
-  {val:3.5,label:'Confirmé+',labelEn:'Confirmed+',color:'#84cc16',desc:'Bandejas, viboras, jeu complet.',descEn:'Bandejas, viboras, complete game.'},
-  {val:4.0,label:'Avancé',labelEn:'Advanced',color:'#f59e0b',desc:'Tournois régionaux, constance élevée.',descEn:'Regional tournaments, high consistency.'},
-  {val:4.5,label:'Expert',labelEn:'Expert',color:'#f97316',desc:'Niveau compétitif national.',descEn:'National competitive level.'},
-  {val:5.0,label:'Pro',labelEn:'Pro',color:'#ef4444',desc:'Niveau professionnel ou semi-pro.',descEn:'Professional or semi-pro level.'},
+  {val:1.0,label:'Débutant',labelEn:'Beginner',labelHe:'מתחיל',color:'#6b7280',desc:'Débute le padel, apprentissage des bases.',descEn:'Just starting padel, learning the basics.'},
+  {val:1.5,label:'Débutant+',labelEn:'Beginner+',labelHe:'מתחיל+',color:'#9ca3af',desc:'Connait les règles, quelques échanges.',descEn:'Knows the rules, can rally.'},
+  {val:2.0,label:'Intermédiaire',labelEn:'Intermediate',labelHe:'בינוני',color:'#3b82f6',desc:'Régularité, coups de base maîtrisés.',descEn:'Consistency, basic shots mastered.'},
+  {val:2.5,label:'Intermédiaire+',labelEn:'Intermediate+',labelHe:'בינוני+',color:'#06b6d4',desc:'Bonne lecture du jeu, tactique simple.',descEn:'Good game reading, simple tactics.'},
+  {val:3.0,label:'Confirmé',labelEn:'Confirmed',labelHe:'מאושר',color:'#10b981',desc:'Maîtrise du mur, variations de jeu.',descEn:'Wall control, game variations.'},
+  {val:3.5,label:'Confirmé+',labelEn:'Confirmed+',labelHe:'מאושר+',color:'#84cc16',desc:'Bandejas, viboras, jeu complet.',descEn:'Bandejas, viboras, complete game.'},
+  {val:4.0,label:'Avancé',labelEn:'Advanced',labelHe:'מתקדם',color:'#f59e0b',desc:'Tournois régionaux, constance élevée.',descEn:'Regional tournaments, high consistency.'},
+  {val:4.5,label:'Expert',labelEn:'Expert',labelHe:'מומחה',color:'#f97316',desc:'Niveau compétitif national.',descEn:'National competitive level.'},
+  {val:5.0,label:'Pro',labelEn:'Pro',labelHe:'פרו',color:'#ef4444',desc:'Niveau professionnel ou semi-pro.',descEn:'Professional or semi-pro level.'},
 ]
 
 const getLevelInfo = v => LEVELS.find(l => l.val === v) || LEVELS[2]
@@ -160,16 +160,17 @@ const getLevelInfo = v => LEVELS.find(l => l.val === v) || LEVELS[2]
 const RATING_KEYS = ['fairplay','service','reflex','power','level']
 const RATING_LABELS = {
   fr:{fairplay:'Fair Play',service:'Service',reflex:'Réflexe',power:'Puissance',level:'Niveau'},
-  en:{fairplay:'Fair Play',service:'Service',reflex:'Reflex',power:'Power',level:'Level'}
+  en:{fairplay:'Fair Play',service:'Service',reflex:'Reflex',power:'Power',level:'Level'},
+  he:{fairplay:'פייר פליי',service:'סרביס',reflex:'רפלקס',power:'עוצמה',level:'רמה'}
 }
 
 const BADGE_DEFS = [
-  {b:'🏆',fr:'Champion',en:'Champion',dFr:'10 victoires',dEn:'10 wins'},
-  {b:'🥇',fr:'Légende',en:'Legend',dFr:'25 victoires',dEn:'25 wins'},
-  {b:'🎯',fr:'Pro',en:'Pro',dFr:'Niveau 4.5+',dEn:'Level 4.5+'},
-  {b:'⚡',fr:'Série',en:'Streak',dFr:'5V consécutives',dEn:'5 wins in a row'},
-  {b:'🤝',fr:'Fair Play',en:'Fair Play',dFr:'Note FP >4.8',dEn:'FP rating >4.8'},
-  {b:'🏅',fr:'Régulier',en:'Regular',dFr:'20+ matchs',dEn:'20+ matches'},
+  {b:'🏆',fr:'Champion',en:'Champion',he:'אלוף',dFr:'10 victoires',dEn:'10 wins',dHe:'10 ניצחונות'},
+  {b:'🥇',fr:'Légende',en:'Legend',he:'אגדה',dFr:'25 victoires',dEn:'25 wins',dHe:'25 ניצחונות'},
+  {b:'🎯',fr:'Pro',en:'Pro',he:'פרו',dFr:'Niveau 4.5+',dEn:'Level 4.5+',dHe:'רמה 4.5+'},
+  {b:'⚡',fr:'Série',en:'Streak',he:'רצף',dFr:'5V consécutives',dEn:'5 wins in a row',dHe:'5 ניצחונות רצופים'},
+  {b:'🤝',fr:'Fair Play',en:'Fair Play',he:'פייר פליי',dFr:'Note FP >4.8',dEn:'FP rating >4.8',dHe:'דירוג FP >4.8'},
+  {b:'🏅',fr:'Régulier',en:'Regular',he:'קבוע',dFr:'20+ matchs',dEn:'20+ matches',dHe:'20+ משחקים'},
 ]
 
 const T = {
@@ -278,6 +279,59 @@ const T = {
     leagueJoined:'✓ League joined!',leagueLeft:'Leave request sent.',
     wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
     maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
+  },
+  he:{
+    home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
+    follow:'עקוב',unfollow:'הפסק לעקוב',rate:'דרג',
+    matchPending:'משחק ממתין',confirm:'אשר',refuse:'דחה',
+    createMatch:'צור משחק',myMatches:'היסטוריית משחקים',
+    pendingMatches:'ממתין לאישור',
+    noFollowing:'אינך עוקב אחרי אף שחקן.',followFirst:'עקוב אחרי שחקנים כדי ליצור משחק חופשי.',
+    vs:'נגד',winner:'מנצח',set:'סט',addSet:'+ הוסף סט',
+    joinLeague:'הצטרף לליגה',createLeague:'צור ליגה',
+    ranking2:'דירוג',matches:'משחקים',teams:'קבוצות',members:'שחקנים',chat:'צ\'אט',
+    pts:'נק',wins:'נ',losses:'ה',played:'מ',
+    addMatch:'הוסף תוצאה',team1:'קבוצה 1',team2:'קבוצה 2',
+    selectTeam:'בחר קבוצה',addTeamMatch:'אשר משחק',
+    randomDraw:'הגרלה אקראית',send:'שלח',message:'הודעה...',
+    editProfile:'ערוך פרופיל',name:'שם',city:'עיר',
+    showLevels:'ראה רמות',showBadges:'התגים שלי',
+    ratingsTitle:'הדירוגים שלי',signOut:'התנתק',
+    expel:'הוצא',privateCode:'קוד גישה',enterCode:'הכנס קוד',access:'כניסה',
+    leagueName:'שם הליגה',season:'עונה',rules:'חוקים',
+    setsMatch:'סטים למשחק',matchDuration:'משך (דק\')',minAge:'גיל מינימלי',
+    visibilityLabel:'נראות הליגה',
+    visibilityPublicDesc:'🌍 ציבורי — כולם יכולים לראות ולהצטרף חופשית.',
+    visibilityPrivateDesc:'🔒 פרטי — רק אנשים עם הקוד יכולים להצטרף.',
+    privateToggleLabel:'הפוך את הליגה לפרטית',
+    create:'צור',currentForm:'כושר נוכחי',pointsHistory:'היסטוריית נקודות',
+    noMatches:'לא שוחקו משחקים',badges:'תגים',worldRank:'עולמי',leagueRank:'ליגות',
+    chooseTeams:'1. בחר שחקנים',enterSets:'2. הכנס תוצאות סט אחר סט',
+    submitMatch:'הגש משחק',selectLeague:'בחר ליגה',
+    myLeagues:'הליגות שלי',otherLeagues:'ליגות אחרות',memberCount:'שחקנים',
+    duration:'משך',minAgeShort:'גיל מינ.',setsPerMatch:'סטים',
+    noMatchYet:'אין משחקים עדיין.',
+    leagueRules:'חוקים',leagueMembers:'חברים',confirmJoin:'הצטרף לליגה',
+    leaveLeague:'עזוב ליגה',leaveRequest:'בקשת עזיבה נשלחה למנהל.',
+    leaveApprove:'אשר',leaveDecline:'דחה',pendingLeaveRequests:'בקשות עזיבה',
+    subAdmins:'מנהלי משנה',addSubAdmin:'מנה מנהל משנה',removeSubAdmin:'הסר',
+    canPostScore:'יכול להוסיף תוצאות',
+    adminOnly:'רק מנהל או מנהל משנה יכול להוסיף תוצאות.',
+    matchWin:'ניצחון',matchLoss:'הפסד',matchFree:'משחק חופשי',
+    waitingConfirm:'ממתין ל',pendingCount:'אישור(ים)',
+    cancelBtn:'בטל',saveBtn:'שמור',loading:'טוען...',
+    age:'שנים',followedPlayers:'שחקנים עוקבים',
+    confirmSignOut:'להתנתק?',
+    confirmExpel:'להוציא שחקן זה מהליגה?',
+    confirmDraw:'להתחיל הגרלה? הקבוצות הקיימות יימחקו.',
+    confirmBalance:'לאזן קבוצות? הקבוצות הקיימות יימחקו.',
+    confirmLeave:'לשלוח בקשת עזיבה למנהל?',
+    errorGeneric:'אירעה שגיאה.',
+    saved:'✓ נשמר!',profileUpdated:'✓ פרופיל עודכן!',
+    matchConfirmed:'✓ משחק אושר!',matchRefused:'משחק נדחה.',
+    leagueJoined:'✓ הצטרפת לליגה!',leagueLeft:'בקשת עזיבה נשלחה.',
+    wrongCode:'קוד שגוי.',nameRequired:'שם קצר מדי (מינ. 2 תווים).',cityRequired:'עיר נדרשת.',
+    maxPlayers:'מגבלת שחקנים',maxPlayersHint:'0 = ללא הגבלה',leagueFull:'הליגה מלאה',
   }
 }
 
@@ -325,7 +379,7 @@ function Av({ size = 40, photo, name = '?' }) {
 
 function LvBadge({ val, lang = 'fr' }) {
   const info = getLevelInfo(val)
-  const lbl = lang === 'en' ? info.labelEn : info.label
+  const lbl = lang === 'en' ? info.labelEn : lang === 'he' ? info.labelHe : info.label
   return <span style={{ background: info.color + '22', border: '1px solid ' + info.color + '55', color: info.color, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{lbl} ({val})</span>
 }
 
@@ -412,7 +466,7 @@ function PlayerPicker({ players, value, onChange, placeholder, excludeIds = [], 
       {!selected && search.length >= 1 && (
         <div style={{ maxHeight: 160, overflowY: 'auto', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10 }}>
           {filtered.length === 0
-            ? <div style={{ padding: '10px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : 'No player found'}</div>
+            ? <div style={{ padding: '10px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : lang === 'he' ? 'שחקן לא נמצא' : 'No player found'}</div>
             : filtered.map(p => (
               <div key={p.id} style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 13 }}
                 onMouseDown={() => { onChange(p.id); setSearch('') }}>
@@ -733,7 +787,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     const memberCount = league?.league_members?.length || 0
     const maxPlayers = league?.max_players || 0
     if (maxPlayers > 0 && memberCount >= maxPlayers) {
-      throw new Error(lang === 'en' ? 'League is full' : 'La ligue est complète')
+      throw new Error(lang === 'fr' ? 'La ligue est complète' : lang === 'he' ? 'הליגה מלאה' : 'League is full')
     }
     const { error } = await supabase.from('league_members').insert({ league_id: leagueId, player_id: me.id, role: 'member' })
     if (error) throw error
@@ -790,7 +844,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     await supabase.from('teams').delete().eq('league_id', leagueId)
     const newTeams = []
     for (let i = 0; i < lp.length; i += 2) {
-      newTeams.push({ league_id: leagueId, name: (lang === 'en' ? 'Team ' : 'Équipe ') + (i / 2 + 1), player1_id: lp[i]?.id || null, player2_id: lp[i + 1]?.id || null })
+      newTeams.push({ league_id: leagueId, name: (lang === 'fr' ? 'Équipe ' : lang === 'he' ? 'קבוצה ' : 'Team ') + (i / 2 + 1), player1_id: lp[i]?.id || null, player2_id: lp[i + 1]?.id || null })
     }
     if (newTeams.length) await supabase.from('teams').insert(newTeams)
     await loadLeagues(0)
@@ -830,14 +884,16 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   return (
     <ToastCtx.Provider value={showToast}>
       <ConfirmCtx.Provider value={confirm}>
-        <div className="app">
+        <div className="app" dir={lang === 'he' ? 'rtl' : 'ltr'}>
           <style>{STYLES}</style>
 
           <div className="header">
             <span className="header-logo">PadelLink</span>
             <div className="header-right">
               {totalNotifs > 0 && <div className="notif-dot">{totalNotifs}</div>}
-              <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : 'fr')}>{lang === 'fr' ? '🇬🇧 EN' : '🇫🇷 FR'}</button>
+              <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : lang === 'en' ? 'he' : 'fr')}>
+  {lang === 'fr' ? '🇬🇧 EN' : lang === 'en' ? '🇮🇱 HE' : '🇫🇷 FR'}
+</button>
             </div>
           </div>
 
@@ -932,8 +988,8 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
           {confirmState && (
             <ConfirmModal
               msg={confirmState.msg}
-              confirmLabel={lang === 'en' ? 'Confirm' : 'Confirmer'}
-              cancelLabel={lang === 'en' ? 'Cancel' : 'Annuler'}
+              confirmLabel={lang === 'fr' ? 'Confirmer' : lang === 'he' ? 'אשר' : 'Confirm'}
+              cancelLabel={lang === 'fr' ? 'Annuler' : lang === 'he' ? 'בטל' : 'Cancel'}
               onConfirm={handleConfirm}
               onCancel={handleConfirmCancel}
             />
@@ -1022,15 +1078,15 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
                 {myConf ? (
                   <div style={{ fontSize: 12, fontWeight: 600, padding: '4px 0' }}>
                     <span style={{ color: myConf.confirmed ? '#10b981' : '#ef4444' }}>
-                      {myConf.confirmed ? '✓ ' + (lang === 'fr' ? 'Confirmé' : 'Confirmed') : '✕ ' + (lang === 'fr' ? 'Refusé' : 'Declined')}
+                      {myConf.confirmed ? '✓ ' + (lang === 'fr' ? 'Confirmé' : lang === 'he' ? 'אושר' : 'Confirmed') : '✕ ' + (lang === 'fr' ? 'Refusé' : lang === 'he' ? 'נדחה' : 'Declined')}
                     </span>
                     {myConf.confirmed && waitingFor.length > 0 && (
                       <span style={{ color: '#f59e0b', marginLeft: 8 }}>
-                        · {lang === 'fr' ? 'En attente de' : 'Waiting for'} {waitingFor.join(', ')}
+                        · {lang === 'fr' ? 'En attente de' : lang === 'he' ? 'ממתין ל' : 'Waiting for'} {waitingFor.join(', ')}
                       </span>
                     )}
                     {myConf.confirmed && waitingFor.length === 0 && (
-                      <span style={{ color: '#10b981', marginLeft: 8 }}>· {lang === 'fr' ? 'Tous ont confirmé ✓' : 'All confirmed ✓'}</span>
+                      <span style={{ color: '#10b981', marginLeft: 8 }}>· {lang === 'fr' ? 'Tous ont confirmé ✓' : lang === 'he' ? 'כולם אישרו ✓' : 'All confirmed ✓'}</span>
                     )}
                   </div>
                 ) : (
@@ -1171,8 +1227,8 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
         {step === 1 && (
           <div>
             <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 6 }}>{t.chooseTeams}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>{lang === 'fr' ? 'Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4' : 'Team1 = players 1&2 · Team2 = players 3&4'}</div>
-            <input className="input" style={{ marginBottom: 8 }} placeholder={'🔍 ' + (lang === 'fr' ? 'Rechercher un joueur...' : 'Search player...')}
+            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>{lang === 'fr' ? 'Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4' : lang === 'he' ? 'קב.1 = שחקנים 1&2 · קב.2 = שחקנים 3&4' : 'Team1 = players 1&2 · Team2 = players 3&4'}</div>
+            <input className="input" style={{ marginBottom: 8 }} placeholder={'🔍 ' + (lang === 'fr' ? 'Rechercher un joueur...' : lang === 'he' ? 'חפש שחקן...' : 'Search player...')}
               value={search} onChange={e => setSearch(e.target.value)} />
             <div style={{ maxHeight: 240, overflowY: 'auto', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
               {filtered.map(p => {
@@ -1194,13 +1250,13 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
                   </div>
                 )
               })}
-              {filtered.length === 0 && <div style={{ padding: '12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : 'No player found'}</div>}
+              {filtered.length === 0 && <div style={{ padding: '12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : lang === 'he' ? 'שחקן לא נמצא' : 'No player found'}</div>}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 8px' }}>{sel.length}/4 · 👥 = {lang === 'fr' ? 'joueur suivi' : 'followed'}</div>
+            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 8px' }}>{sel.length}/4 · 👥 = {lang === 'fr' ? 'joueur suivi' : lang === 'he' ? 'עוקב' : 'followed'}</div>
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <div className="row gap8">
               <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-              <button className="btn btn-primary flex1" disabled={sel.length !== 4} onClick={() => sel.length === 4 && setStep(2)}>{lang === 'fr' ? 'Suivant →' : 'Next →'}</button>
+              <button className="btn btn-primary flex1" disabled={sel.length !== 4} onClick={() => sel.length === 4 && setStep(2)}>{lang === 'fr' ? 'Suivant →' : lang === 'he' ? 'הבא →' : 'Next →'}</button>
             </div>
           </div>
         )}
@@ -1220,7 +1276,7 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
               </button>
             </div>
             <div style={{ marginTop: 10, padding: '8px 10px', background: 'rgba(139,92,246,0.07)', borderRadius: 8, fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>
-              ℹ️ {lang === 'fr' ? 'Ce match sera envoyé aux 3 autres joueurs pour confirmation.' : 'This match will be sent to the 3 other players for confirmation.'}
+              ℹ️ {lang === 'fr' ? 'Ce match sera envoyé aux 3 autres joueurs pour confirmation.' : lang === 'he' ? 'המשחק ישלח ל-3 שחקנים האחרים לאישור.' : 'This match will be sent to the 3 other players for confirmation.'}
             </div>
           </div>
         )}
@@ -1259,7 +1315,7 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
         const isMe = p.id === me.id
         const isF = isFollowing(p.id)
         const info = getLevelInfo(p.level)
-        const lbl = lang === 'en' ? info.labelEn : info.label
+        const lbl = lang === 'en' ? info.labelEn : lang === 'he' ? info.labelHe : info.label
         const pRatings = ratings.filter(r => r.rated_id === p.id)
         const badges = computeBadges(p, pRatings)
         const busy = followingId === p.id
@@ -1295,7 +1351,7 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
       })}
       <div style={{ padding: '0 16px 16px' }}>
         <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { const next = page + 1; setPage(next); loadPlayers(search, next) }}>
-          {lang === 'en' ? 'Load more' : 'Charger plus'}
+          {lang === 'fr' ? 'Charger plus' : lang === 'he' ? 'טען עוד' : 'Load more'}
         </button>
       </div>
       {ratingModal && (
@@ -1321,14 +1377,14 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
     })
   }, [player?.id])
 
-  if (!player) return <div className="empty">{lang === 'fr' ? 'Joueur introuvable' : 'Player not found'}</div>
+  if (!player) return <div className="empty">{lang === 'fr' ? 'Joueur introuvable' : lang === 'he' ? 'שחקן לא נמצא' : 'Player not found'}</div>
 
   const isMe = player.id === me.id
   const isF = isFollowing(player.id)
   const info = getLevelInfo(player.level)
   const pRatings = allPlayerRatings ?? ratings.filter(r => r.rated_id === player.id)
   const badges = computeBadges(player, pRatings)
-  const rl = RATING_LABELS[lang]
+  const rl = RATING_LABELS[lang] || RATING_LABELS.en
 
   const playerMatches = myMatches.filter(m => {
     if (m.league_id) {
@@ -1348,7 +1404,7 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
   return (
     <div>
       <div className="row" style={{ padding: '14px 16px 8px' }}>
-        <button className="btn btn-outline btn-sm" onClick={onBack}>← {lang === 'fr' ? 'Retour' : 'Back'}</button>
+        <button className="btn btn-outline btn-sm" onClick={onBack}>← {lang === 'fr' ? 'Retour' : lang === 'he' ? 'חזרה' : 'Back'}</button>
         <span className="fw700" style={{ fontSize: 15, marginLeft: 8 }}>{player.name}</span>
       </div>
       <div className="card">
@@ -1423,7 +1479,7 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
 
 // ══ RATING MODAL ══
 function RatingModal({ t, lang, target, myExisting, submitRating, onClose }) {
-  const rl = RATING_LABELS[lang]
+  const rl = RATING_LABELS[lang] || RATING_LABELS.en
   const [ratings, setRatings] = useState({
     fairplay: myExisting?.fairplay || 0, service: myExisting?.service || 0,
     reflex: myExisting?.reflex || 0, power: myExisting?.power || 0,
@@ -1478,7 +1534,7 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
         <div style={{ cursor: 'pointer' }} onClick={() => isMem ? setViewLeagueId(l.id) : setPreviewLeagueId(l.id)}>
           <div className="row mb4">
             <div className="fw700 flex1" style={{ fontSize: 15 }}>{l.is_private ? '🔒 ' : '🌍 '}{l.name}</div>
-            {isMem && <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700 }}>✓ {lang === 'en' ? 'Member' : 'Membre'}</span>}
+            {isMem && <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700 }}>✓ {lang === 'fr' ? 'Membre' : lang === 'he' ? 'חבר' : 'Member'}</span>}
             {!isMem && isFull && <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>🔴 {t.leagueFull}</span>}
           </div>
           <div className="text-sm mb4">{l.season}</div>
@@ -1520,10 +1576,10 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
           {otherLeagues.map(renderLeague)}
         </div>
       )}
-      {leagues.length === 0 && <div className="empty">{lang === 'fr' ? 'Aucune ligue.\nCrée la première ! 🎾' : 'No leagues yet.\nCreate the first one! 🎾'}</div>}
+      {leagues.length === 0 && <div className="empty">{lang === 'fr' ? 'Aucune ligue.\nCrée la première ! 🎾' : lang === 'he' ? 'אין ליגות עדיין.\nצור את הראשונה! 🎾' : 'No leagues yet.\nCreate the first one! 🎾'}</div>}
       {showCreate && (
         <CreateLeagueModal t={t} lang={lang}
-          onCreate={async d => { try { await createLeague(d); setShowCreate(false); showToast(lang === 'fr' ? '✓ Ligue créée !' : '✓ League created!', 'ok') } catch { showToast(t.errorGeneric, 'err') } }}
+          onCreate={async d => { try { await createLeague(d); setShowCreate(false); showToast(lang === 'fr' ? '✓ Ligue créée !' : lang === 'he' ? '✓ ליגה נוצרה!' : '✓ League created!', 'ok') } catch { showToast(t.errorGeneric, 'err') } }}
           onClose={() => setShowCreate(false)} />
       )}
     </div>
@@ -1621,7 +1677,7 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
       {isMem && (
         <div style={{ padding: '12px 16px' }}>
           <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setViewLeagueId(league.id); setPreviewLeagueId(null) }}>
-            {lang === 'en' ? 'Open league' : 'Ouvrir la ligue'}
+            {lang === 'fr' ? 'Ouvrir la ligue' : lang === 'he' ? 'פתח ליגה' : 'Open league'}
           </button>
         </div>
       )}
@@ -1934,12 +1990,12 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   }
 
   async function handleDelete(teamId) {
-    const ok = await confirm(lang === 'fr' ? 'Supprimer cette équipe ?' : 'Delete this team?')
+    const ok = await confirm(lang === 'fr' ? 'Supprimer cette équipe ?' : lang === 'he' ? 'למחוק קבוצה זו?' : 'Delete this team?')
     if (!ok) return
     try {
       await supabase.from('teams').delete().eq('id', teamId)
       await loadLeagues(0)
-      showToast(lang === 'fr' ? 'Équipe supprimée' : 'Team deleted', 'ok')
+      showToast(lang === 'fr' ? 'Équipe supprimée' : lang === 'he' ? 'קבוצה נמחקה' : 'Team deleted', 'ok')
     } catch { showToast(t.errorGeneric, 'err') }
   }
 
@@ -1956,7 +2012,7 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     const ok = await confirm(t.confirmDraw)
     if (!ok) return
     setDrawing(true)
-    try { await randomDrawTeams(league.id); showToast(lang === 'fr' ? '🎲 Tirage effectué !' : '🎲 Draw done!', 'ok') }
+    try { await randomDrawTeams(league.id); showToast(lang === 'fr' ? '🎲 Tirage effectué !' : lang === 'he' ? '🎲 הגרלה בוצעה!' : '🎲 Draw done!', 'ok') }
     catch { showToast(t.errorGeneric, 'err') }
     setDrawing(false)
   }
@@ -1970,11 +2026,11 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
       await supabase.from('teams').delete().eq('league_id', league.id)
       const newTeams = []
       for (let i = 0; i < sorted.length; i += 2) {
-        newTeams.push({ league_id: league.id, name: (lang === 'en' ? 'Team ' : 'Équipe ') + (i / 2 + 1), player1_id: sorted[i]?.id || null, player2_id: sorted[i + 1]?.id || null })
+        newTeams.push({ league_id: league.id, name: (lang === 'fr' ? 'Équipe ' : lang === 'he' ? 'קבוצה ' : 'Team ') + (i / 2 + 1), player1_id: sorted[i]?.id || null, player2_id: sorted[i + 1]?.id || null })
       }
       if (newTeams.length) await supabase.from('teams').insert(newTeams)
       await loadLeagues(0)
-      showToast(lang === 'fr' ? '⚖️ Équipes équilibrées !' : '⚖️ Teams balanced!', 'ok')
+      showToast(lang === 'fr' ? '⚖️ Équipes équilibrées !' : lang === 'he' ? '⚖️ קבוצות אוזנו!' : '⚖️ Teams balanced!', 'ok')
     } catch { showToast(t.errorGeneric, 'err') }
     setBalancing(false)
   }
@@ -1994,25 +2050,25 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
         <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-outline flex1" disabled={drawing} onClick={handleDraw}>{drawing ? <Spin /> : '🎲'} {t.randomDraw}</button>
           <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={balancing} onClick={handleBalance}>
-            {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : 'Balance'}
+            {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : lang === 'he' ? 'אזן' : 'Balance'}
           </button>
           {!allAssigned && (
             <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setShowCreate(true); setNewName(''); setNewP1(''); setNewP2('') }}>
-              + {lang === 'fr' ? 'Créer une équipe' : 'Create a team'}
+              + {lang === 'fr' ? 'Créer une équipe' : lang === 'he' ? 'צור קבוצה' : 'Create a team'}
             </button>
           )}
         </div>
       )}
       {showCreate && canEdit && (
         <div className="card card-green mb8">
-          <div className="fw600 mb8" style={{ fontSize: 13 }}>{lang === 'fr' ? 'Nouvelle équipe' : 'New team'}</div>
-          <input className="input mb8" value={newName} onChange={e => setNewName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} maxLength={40} />
-          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : 'Player 1'}</div>
+          <div className="fw600 mb8" style={{ fontSize: 13 }}>{lang === 'fr' ? 'Nouvelle équipe' : lang === 'he' ? 'קבוצה חדשה' : 'New team'}</div>
+          <input className="input mb8" value={newName} onChange={e => setNewName(e.target.value)} placeholder={lang === 'fr' ? "Nom de l'équipe" : lang === 'he' ? 'שם הקבוצה' : 'Team name'} maxLength={40} />
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : lang === 'he' ? 'שחקן 1' : 'Player 1'}</div>
           <PlayerPicker players={leaguePlayers} value={newP1} onChange={setNewP1}
-            placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : 'Search player 1...'} excludeIds={newP2 ? [newP2] : []} lang={lang} />
-          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 2' : 'Player 2'}</div>
+            placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : lang === 'he' ? 'חפש שחקן 1...' : 'Search player 1...'} excludeIds={newP2 ? [newP2] : []} lang={lang} />
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 2' : lang === 'he' ? 'שחקן 2' : 'Player 2'}</div>
           <PlayerPicker players={leaguePlayers} value={newP2} onChange={setNewP2}
-            placeholder={lang === 'fr' ? 'Rechercher joueur 2...' : 'Search player 2...'} excludeIds={newP1 ? [newP1] : []} lang={lang} />
+            placeholder={lang === 'fr' ? 'Rechercher joueur 2...' : lang === 'he' ? 'חפש שחקן 2...' : 'Search player 2...'} excludeIds={newP1 ? [newP1] : []} lang={lang} />
           <div className="row gap8 mt8">
             <button className="btn btn-outline flex1" onClick={() => setShowCreate(false)}>{t.cancelBtn}</button>
             <button className="btn btn-primary flex1" disabled={!newName.trim() || creating} onClick={handleCreate}>
@@ -2021,7 +2077,7 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
           </div>
         </div>
       )}
-      {(league.teams || []).length === 0 && <div className="empty">{lang === 'en' ? 'No teams yet.' : 'Aucune équipe.'}</div>}
+      {(league.teams || []).length === 0 && <div className="empty">{lang === 'fr' ? 'Aucune équipe.' : lang === 'he' ? 'אין קבוצות עדיין.' : 'No teams yet.'}</div>}
       {(league.teams || []).map(tm => {
         const p1 = players.find(p => p.id === tm.player1_id)
         const p2 = players.find(p => p.id === tm.player2_id)
@@ -2031,13 +2087,13 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
           <div key={tm.id} className="card mb8">
             {isEd ? (
               <div>
-                <input className="input mb8" value={eName} onChange={e => setEName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} />
-                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : 'Player 1'}</div>
+                <input className="input mb8" value={eName} onChange={e => setEName(e.target.value)} placeholder={lang === 'fr' ? "Nom de l'équipe" : lang === 'he' ? 'שם הקבוצה' : 'Team name'} />
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : lang === 'he' ? 'שחקן 1' : 'Player 1'}</div>
                 <PlayerPicker players={leaguePlayers} value={eP1} onChange={setEP1}
-                  placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : 'Search player 1...'} excludeIds={eP2 ? [eP2] : []} lang={lang} />
-                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 2' : 'Player 2'}</div>
+                  placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : lang === 'he' ? 'חפש שחקן 1...' : 'Search player 1...'} excludeIds={eP2 ? [eP2] : []} lang={lang} />
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 2' : lang === 'he' ? 'שחקן 2' : 'Player 2'}</div>
                 <PlayerPicker players={leaguePlayers} value={eP2} onChange={setEP2}
-                  placeholder={lang === 'fr' ? 'Rechercher joueur 2...' : 'Search player 2...'} excludeIds={eP1 ? [eP1] : []} lang={lang} />
+                  placeholder={lang === 'fr' ? 'Rechercher joueur 2...' : lang === 'he' ? 'חפש שחקן 2...' : 'Search player 2...'} excludeIds={eP1 ? [eP1] : []} lang={lang} />
                 <div className="row gap8 mt8">
                   <button className="btn btn-outline flex1" onClick={() => setEditId(null)}>{t.cancelBtn}</button>
                   <button className="btn btn-primary flex1" disabled={saving} onClick={saveTeamEdit}>{saving ? <Spin /> : t.saveBtn}</button>
@@ -2079,7 +2135,7 @@ function LeagueMembersTab({ t, lang, league, players, isAdmin, expelMember, togg
     const ok = await confirm(t.confirmExpel + ' (' + playerName + ')')
     if (!ok) return
     setExpellingId(playerId)
-    try { await expelMember(league.id, playerId); showToast(lang === 'fr' ? 'Joueur expulsé' : 'Player expelled', 'ok') }
+    try { await expelMember(league.id, playerId); showToast(lang === 'fr' ? 'Joueur expulsé' : lang === 'he' ? 'שחקן הוצא' : 'Player expelled', 'ok') }
     catch { showToast(t.errorGeneric, 'err') }
     setExpellingId(null)
   }
@@ -2205,7 +2261,7 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
 
   function renderRow(p, rank, isMe = false) {
     const info = getLevelInfo(p.level)
-    const lbl = lang === 'en' ? info.labelEn : info.label
+    const lbl = lang === 'en' ? info.labelEn : lang === 'he' ? info.labelHe : info.label
     const nc = 'rank-num' + (rank === 0 ? ' top1' : rank === 1 ? ' top2' : rank === 2 ? ' top3' : '')
     const pRatings = ratings.filter(r => r.rated_id === p.id)
     const badges = computeBadges(p, pRatings)
@@ -2239,7 +2295,7 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
       <div className="tab-bar">
         <button className={'tab-pill ' + (rankTab === 'world' ? 'active' : '')} onClick={() => setRankTab('world')}>{t.worldRank}</button>
         <button className={'tab-pill ' + (rankTab === 'league' ? 'active' : '')} onClick={() => setRankTab('league')}>
-          {lang === 'fr' ? '👥 Suivis' : '👥 Followed'}
+          {lang === 'fr' ? '👥 Suivis' : lang === 'he' ? '👥 עוקבים' : '👥 Followed'}
         </button>
       </div>
       {rankTab === 'world' && (
@@ -2249,11 +2305,11 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
           )}
           {visible.map((p, i) => renderRow(p, windowStart + i, p.id === me.id))}
           <div className="card mt8">
-            <div className="fw600 mb8" style={{ fontSize: 12 }}>{lang === 'en' ? 'Point system:' : 'Système de points :'}</div>
+            <div className="fw600 mb8" style={{ fontSize: 12 }}>{lang === 'fr' ? 'Système de points :' : lang === 'he' ? 'מערכת נקודות:' : 'Point system:'}</div>
             <div className="text-xs" style={{ lineHeight: 2 }}>
-              🏆 {lang === 'en' ? 'Win' : 'Victoire'} = +10pts{'\n'}
-              ⭐ {lang === 'en' ? 'Clean sweep' : 'Set blanc'} = +12pts{'\n'}
-              ❌ {lang === 'en' ? 'Loss' : 'Défaite'} = +3pts
+              🏆 {lang === 'fr' ? 'Victoire' : lang === 'he' ? 'ניצחון' : 'Win'} = +10pts{'\n'}
+              ⭐ {lang === 'fr' ? 'Set blanc' : lang === 'he' ? 'ניצחון נקי' : 'Clean sweep'} = +12pts{'\n'}
+              ❌ {lang === 'fr' ? 'Défaite' : lang === 'he' ? 'הפסד' : 'Loss'} = +3pts
             </div>
           </div>
         </div>
@@ -2261,7 +2317,7 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
       {rankTab === 'league' && (
         <div>
           {followedSorted.length === 0
-            ? <div className="empty">{lang === 'fr' ? 'Tu ne suis aucun joueur.' : 'You follow no players.'}</div>
+            ? <div className="empty">{lang === 'fr' ? 'Tu ne suis aucun joueur.' : lang === 'he' ? 'אינך עוקב אחרי אף שחקן.' : 'You follow no players.'}</div>
             : followedSorted.map((p, idx) => renderRow(p, idx))
           }
         </div>
@@ -2284,8 +2340,8 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
   const showToast = useToast()
   const confirm = useConfirm()
   const info = getLevelInfo(me.level)
-  const lbl = lang === 'en' ? info.labelEn : info.label
-  const rl = RATING_LABELS[lang]
+  const lbl = lang === 'en' ? info.labelEn : lang === 'he' ? info.labelHe : info.label
+  const rl = RATING_LABELS[lang] || RATING_LABELS.en
 
   const n = Math.min(myMatches.length, 10)
   const SVG_W = 300, SVG_H = 80
@@ -2352,7 +2408,7 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
               <input className="input" value={eName} maxLength={50} onChange={e => setEName(e.target.value)} />
               <input className="input" value={eCity} maxLength={50} onChange={e => setECity(e.target.value)} />
               <select className="select" value={eLevel} onChange={e => setELevel(parseFloat(e.target.value))}>
-                {LEVELS.map(lv => <option key={lv.val} value={lv.val}>{lv.val} — {lang === 'en' ? lv.labelEn : lv.label}</option>)}
+                {LEVELS.map(lv => <option key={lv.val} value={lv.val}>{lv.val} — {lang === 'en' ? lv.labelEn : lang === 'he' ? lv.labelHe : lv.label}</option>)}
               </select>
             </div>
           )}
@@ -2441,8 +2497,8 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
           <div className="fw600 mb8" style={{ fontSize: 12 }}>{t.badges}</div>
           {BADGE_DEFS.map(item => {
             const has = myBadges.includes(item.b)
-            const bl = lang === 'en' ? item.en : item.fr
-            const bd = lang === 'en' ? item.dEn : item.dFr
+            const bl = lang === 'en' ? item.en : lang === 'he' ? item.he : item.fr
+            const bd = lang === 'en' ? item.dEn : lang === 'he' ? item.dHe : item.dFr
             return (
               <div key={item.b} className="row mb8" style={{ opacity: has ? 1 : 0.35 }}>
                 <span style={{ fontSize: 20, marginRight: 8 }}>{item.b}</span>
