@@ -2203,19 +2203,20 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
     return wr >= 0.6 ? '#10b981' : wr >= 0.4 ? '#f59e0b' : '#ef4444'
   }
 
-  function renderRow(p, idx) {
+  function renderRow(p, rank, isMe = false) {
     const info = getLevelInfo(p.level)
     const lbl = lang === 'en' ? info.labelEn : info.label
-    const nc = 'rank-num' + (idx === 0 ? ' top1' : idx === 1 ? ' top2' : idx === 2 ? ' top3' : '')
+    const nc = 'rank-num' + (rank === 0 ? ' top1' : rank === 1 ? ' top2' : rank === 2 ? ' top3' : '')
     const pRatings = ratings.filter(r => r.rated_id === p.id)
     const badges = computeBadges(p, pRatings)
     const wp = p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0
     return (
-      <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}>
-        <div className={nc}>{idx + 1}</div>
+      <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}
+        style={isMe ? { background: 'rgba(168,85,247,0.10)', borderRadius: 10 } : {}}>
+        <div className={nc}>{rank + 1}</div>
         <Av size={34} photo={p.photo_url} name={p.name} />
         <div className="col flex1">
-          <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}{badges.length ? ' ' + badges.slice(0, 2).join('') : ''}</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}{isMe ? ' 👤' : ''}{badges.length ? ' ' + badges.slice(0, 2).join('') : ''}</span>
           <div style={{ display: 'flex', gap: 4 }}>
             <span style={{ fontSize: 10, color: info.color }}>{lbl}</span>
             <span className="text-xs">{p.city}</span>
@@ -2228,6 +2229,10 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
     )
   }
 
+  const myRank = sorted.findIndex(p => p.id === me.id)
+  const windowStart = Math.max(0, Math.min(myRank - 7, sorted.length - 15))
+  const visible = sorted.slice(windowStart, windowStart + 15)
+
   return (
     <div>
       <div className="section-title">{t.ranking}</div>
@@ -2239,7 +2244,10 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
       </div>
       {rankTab === 'world' && (
         <div>
-          {sorted.map((p, idx) => renderRow(p, idx))}
+          {windowStart > 0 && (
+            <div style={{ textAlign: 'center', fontSize: 11, color: '#4b5563', padding: '4px 0 2px', letterSpacing: 2 }}>···</div>
+          )}
+          {visible.map((p, i) => renderRow(p, windowStart + i, p.id === me.id))}
           <div className="card mt8">
             <div className="fw600 mb8" style={{ fontSize: 12 }}>{lang === 'en' ? 'Point system:' : 'Système de points :'}</div>
             <div className="text-xs" style={{ lineHeight: 2 }}>
