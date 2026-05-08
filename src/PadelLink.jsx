@@ -228,6 +228,10 @@ const T = {
     maxPlayers:'Limite de joueurs',maxPlayersHint:'0 = illimité',leagueFull:'La ligue est complète',
     leagueFormError:'Vous devez remplir toutes les cases pour pouvoir créer la ligue.',
     durationHint:'0 = illimité',
+    drawDesc:'Mélange aléatoire — les équipes sont formées au hasard.',
+    balanceDesc:'1er avec le 3e, 2e avec le 4e — équipes de niveau similaire.',
+    availablePlayers:'Joueurs disponibles',
+    completeTeams:'⚡ Générer les équipes restantes automatiquement',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -283,6 +287,10 @@ const T = {
     maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
     leagueFormError:'You must fill all fields to create the league.',
     durationHint:'0 = unlimited',
+    drawDesc:'Random shuffle — teams are formed randomly.',
+    balanceDesc:'1st with 3rd, 2nd with 4th — teams of similar level.',
+    availablePlayers:'Available players',
+    completeTeams:'⚡ Auto-generate remaining teams',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
@@ -338,6 +346,10 @@ const T = {
     maxPlayers:'מגבלת שחקנים',maxPlayersHint:'0 = ללא הגבלה',leagueFull:'הליגה מלאה',
     leagueFormError:'עליך למלא את כל השדות כדי ליצור את הליגה.',
     durationHint:'0 = ללא הגבלה',
+    drawDesc:'ערבוב אקראי — הקבוצות נוצרות באקראי.',
+    balanceDesc:'ראשון עם שלישי, שני עם רביעי — קבוצות ברמה דומה.',
+    availablePlayers:'שחקנים זמינים',
+    completeTeams:'⚡ הגנרט את הקבוצות הנותרות אוטומטית',
   }
 }
 
@@ -1984,6 +1996,7 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   const [saving, setSaving] = useState(false)
   const [drawing, setDrawing] = useState(false)
   const [balancing, setBalancing] = useState(false)
+  const [completing, setCompleting] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newP1, setNewP1] = useState('')
@@ -1994,9 +2007,21 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   const leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
   const leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
 
-  function playerOption(p) {
-    const wp = p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0
-    return `${p.name} · Niv.${p.level} · ${wp}% V`
+  const assignedIds = new Set(
+    (league.teams || []).flatMap(tm => [tm.player1_id, tm.player2_id]).filter(Boolean)
+  )
+  const unassigned = leaguePlayers.filter(p => !assignedIds.has(p.id))
+
+  const teamPrefix = lang === 'fr' ? 'Équipe ' : lang === 'he' ? 'קבוצה ' : 'Team '
+
+  function makeBalancedPairs(ps) {
+    const sorted = ps.slice().sort((a, b) => b.level - a.level)
+    const pairs = []
+    for (let i = 0; i < sorted.length; i += 4) {
+      if (sorted[i]) pairs.push([sorted[i], sorted[i + 2] || null])
+      if (sorted[i + 1]) pairs.push([sorted[i + 1], sorted[i + 3] || null])
+    }
+    return pairs
   }
 
   async function handleCreate() {
@@ -2025,8 +2050,7 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     setSaving(true)
     await supabase.from('teams').update({ name: eName, player1_id: eP1 || null, player2_id: eP2 || null }).eq('id', editId)
     await loadLeagues(0)
-    setEditId(null)
-    setSaving(false)
+    setEditId(null); setSaving(false)
     showToast(t.saved, 'ok')
   }
 
@@ -2044,12 +2068,12 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     if (!ok) return
     setBalancing(true)
     try {
-      const sorted = leaguePlayers.slice().sort((a, b) => b.level - a.level)
       await supabase.from('teams').delete().eq('league_id', league.id)
-      const newTeams = []
-      for (let i = 0; i < sorted.length; i += 2) {
-        newTeams.push({ league_id: league.id, name: (lang === 'fr' ? 'Équipe ' : lang === 'he' ? 'קבוצה ' : 'Team ') + (i / 2 + 1), player1_id: sorted[i]?.id || null, player2_id: sorted[i + 1]?.id || null })
-      }
+      const pairs = makeBalancedPairs(leaguePlayers)
+      const newTeams = pairs.map((pair, i) => ({
+        league_id: league.id, name: teamPrefix + (i + 1),
+        player1_id: pair[0]?.id || null, player2_id: pair[1]?.id || null
+      }))
       if (newTeams.length) await supabase.from('teams').insert(newTeams)
       await loadLeagues(0)
       showToast(lang === 'fr' ? '⚖️ Équipes équilibrées !' : lang === 'he' ? '⚖️ קבוצות אוזנו!' : '⚖️ Teams balanced!', 'ok')
@@ -2057,34 +2081,89 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     setBalancing(false)
   }
 
+  async function handleCompleteRemaining() {
+    if (unassigned.length < 2) return
+    setCompleting(true)
+    try {
+      const pairs = makeBalancedPairs(unassigned)
+      const existingCount = (league.teams || []).length
+      const newTeams = pairs.map((pair, i) => ({
+        league_id: league.id, name: teamPrefix + (existingCount + i + 1),
+        player1_id: pair[0]?.id || null, player2_id: pair[1]?.id || null
+      }))
+      if (newTeams.length) await supabase.from('teams').insert(newTeams)
+      await loadLeagues(0)
+      showToast(lang === 'fr' ? '⚡ Équipes complétées !' : lang === 'he' ? '⚡ קבוצות הושלמו!' : '⚡ Teams completed!', 'ok')
+    } catch { showToast(t.errorGeneric, 'err') }
+    setCompleting(false)
+  }
+
   function teamAvg(tm) {
     const lvls = [players.find(p => p.id === tm.player1_id)?.level, players.find(p => p.id === tm.player2_id)?.level].filter(Boolean)
     return lvls.length ? (lvls.reduce((a, b) => a + b, 0) / lvls.length).toFixed(1) : null
   }
 
-  const allAssigned = leaguePlayers.length > 0 && leaguePlayers.every(p =>
-    (league.teams || []).some(tm => tm.player1_id === p.id || tm.player2_id === p.id)
-  )
+  const allAssigned = leaguePlayers.length > 0 && unassigned.length === 0
+  const hasPartialTeams = (league.teams || []).length > 0 && unassigned.length >= 2
+
+  function pickPlayer(pid) {
+    if (!newP1) setNewP1(pid)
+    else if (!newP2 && pid !== newP1) setNewP2(pid)
+  }
 
   return (
     <div style={{ padding: '0 16px' }}>
       {canEdit && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-outline flex1" disabled={drawing} onClick={handleDraw}>{drawing ? <Spin /> : '🎲'} {t.randomDraw}</button>
-          <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={balancing} onClick={handleBalance}>
-            {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : lang === 'he' ? 'אזן' : 'Balance'}
-          </button>
-          {!allAssigned && (
-            <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setShowCreate(true); setNewName(''); setNewP1(''); setNewP2('') }}>
-              + {lang === 'fr' ? 'Créer une équipe' : lang === 'he' ? 'צור קבוצה' : 'Create a team'}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 120 }}>
+            <button className="btn btn-outline" style={{ width: '100%' }} disabled={drawing} onClick={handleDraw}>
+              {drawing ? <Spin /> : '🎲'} {t.randomDraw}
             </button>
-          )}
+            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>{t.drawDesc}</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 120 }}>
+            <button style={{ width: '100%', background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={balancing} onClick={handleBalance}>
+              {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : lang === 'he' ? 'אזן' : 'Balance'}
+            </button>
+            <div style={{ fontSize: 10, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>{t.balanceDesc}</div>
+          </div>
         </div>
+      )}
+      {canEdit && !allAssigned && (
+        <button className="btn btn-green" style={{ width: '100%', marginBottom: 8, marginTop: 4 }} onClick={() => { setShowCreate(true); setNewName(''); setNewP1(''); setNewP2('') }}>
+          + {lang === 'fr' ? 'Créer une équipe' : lang === 'he' ? 'צור קבוצה' : 'Create a team'}
+        </button>
       )}
       {showCreate && canEdit && (
         <div className="card card-green mb8">
           <div className="fw600 mb8" style={{ fontSize: 13 }}>{lang === 'fr' ? 'Nouvelle équipe' : lang === 'he' ? 'קבוצה חדשה' : 'New team'}</div>
           <input className="input mb8" value={newName} onChange={e => setNewName(e.target.value)} placeholder={lang === 'fr' ? "Nom de l'équipe" : lang === 'he' ? 'שם הקבוצה' : 'Team name'} maxLength={40} />
+          {unassigned.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 6 }}>{t.availablePlayers}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {unassigned.map(p => {
+                  const isP1 = newP1 === p.id, isP2 = newP2 === p.id
+                  const wp = p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0
+                  return (
+                    <button key={p.id} onClick={() => {
+                      if (isP1) setNewP1('')
+                      else if (isP2) setNewP2('')
+                      else pickPlayer(p.id)
+                    }} style={{
+                      padding: '5px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                      cursor: 'pointer', border: '1.5px solid',
+                      borderColor: isP1 ? '#06b6d4' : isP2 ? '#a855f7' : 'rgba(255,255,255,0.12)',
+                      background: isP1 ? 'rgba(6,182,212,0.2)' : isP2 ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.05)',
+                      color: isP1 ? '#06b6d4' : isP2 ? '#a855f7' : '#d1d5db',
+                    }}>
+                      {p.name} · {p.level} · {wp}%V {isP1 ? '①' : isP2 ? '②' : ''}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : lang === 'he' ? 'שחקן 1' : 'Player 1'}</div>
           <PlayerPicker players={leaguePlayers} value={newP1} onChange={setNewP1}
             placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : lang === 'he' ? 'חפש שחקן 1...' : 'Search player 1...'} excludeIds={newP2 ? [newP2] : []} lang={lang} />
@@ -2143,6 +2222,11 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
           </div>
         )
       })}
+      {canEdit && hasPartialTeams && (
+        <button style={{ width: '100%', marginTop: 4, marginBottom: 8, background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7', borderRadius: 12, padding: '11px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }} disabled={completing} onClick={handleCompleteRemaining}>
+          {completing ? <Spin /> : t.completeTeams}
+        </button>
+      )}
     </div>
   )
 }
