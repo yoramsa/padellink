@@ -411,6 +411,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   const [freeMatches, setFreeMatches] = useState([])
   const [leagueMatches, setLeagueMatches] = useState([])
   const [leaveRequests, setLeaveRequests] = useState([])
+  const [matchConfirmations, setMatchConfirmations] = useState([])
   const [viewPlayerId, setViewPlayerId] = useState(null)
   const [viewLeagueId, setViewLeagueId] = useState(null)
   const [previewLeagueId, setPreviewLeagueId] = useState(null)
@@ -536,6 +537,11 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     if (data) {
       setFreeMatches(data)
       await loadPlayersByIds(data.flatMap(m => [m.creator_id, m.player1_id, m.player2_id, m.player3_id, m.player4_id]))
+      const matchIds = data.map(m => m.id)
+      if (matchIds.length) {
+        const { data: confs } = await supabase.from('free_match_confirmations').select('*').in('match_id', matchIds)
+        if (confs) setMatchConfirmations(confs)
+      }
     }
   }
 
@@ -618,9 +624,48 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     await loadFreeMatches()
   }
 
-  async function respondFreeMatch(matchId, confirmed) {
-    const { error } = await supabase.from('free_match_confirmations').insert({ match_id: matchId, player_id: me.id, confirmed })
-    if (error) throw error
+  async function awardMatchPoints(match) {
+    const sets = match.sets || []
+    let w1 = 0, w2 = 0
+    sets.forEach(s => { if (s.a > s.b) w1++; else if (s.b > s.a) w2++ })
+    const team1wins = w1 > w2
+    const isCleanSweep = team1wins ? w2 === 0 : w1 === 0
+    const winPts = isCleanSweep ? 12 : 10
+    const team1 = [match.player1_id, match.player2_id].filter(Boolean)
+    const team2 = [match.player3_id, match.player4_id].filter(Boolean)
+    const winners = team1wins ? team1 : team2
+    const losers = team1wins ? team2 : team1
+    for (const pid of winners) {
+      const { data: p } = await supabase.from('players').select('wins,matches,points,win_history').eq('id', pid).single()
+      if (!p) continue
+      await supabase.from('players').update({ wins: p.wins + 1, matches: p.matches + 1, points: p.points + winPts, win_history: [...(p.win_history || []), 1] }).eq('id', pid)
+    }
+    for (const pid of losers) {
+      const { data: p } = await supabase.from('players').select('wins,matches,points,win_history').eq('id', pid).single()
+      if (!p) continue
+      await supabase.from('players').update({ matches: p.matches + 1, points: p.points + 3, win_history: [...(p.win_history || []), 0] }).eq('id', pid)
+    }
+  }
+
+  async function respondFreeMatch(matchId, responded) {
+    const { data: existing } = await supabase.from('free_match_confirmations')
+      .select('id').eq('match_id', matchId).eq('player_id', me.id).maybeSingle()
+    if (!existing) {
+      const { error } = await supabase.from('free_match_confirmations').insert({ match_id: matchId, player_id: me.id, confirmed: responded })
+      if (error) throw error
+    }
+    if (responded) {
+      const match = freeMatches.find(m => m.id === matchId)
+      if (match) {
+        const nonCreatorIds = [match.player1_id, match.player2_id, match.player3_id, match.player4_id].filter(id => id && id !== match.creator_id)
+        const { data: confs } = await supabase.from('free_match_confirmations').select('*').eq('match_id', matchId).eq('confirmed', true)
+        const confirmedIds = (confs || []).map(c => c.player_id)
+        if (nonCreatorIds.every(id => confirmedIds.includes(id))) {
+          await supabase.from('free_matches').update({ status: 'confirmed' }).eq('id', matchId)
+          await awardMatchPoints(match)
+        }
+      }
+    }
     await loadFreeMatches()
     await refreshMe()
     await loadPlayers('', 0)
@@ -694,11 +739,12 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     const league = leagues.find(l => l.id === leagueId)
     const leaguePlayerIds = (league?.league_members || []).map(lm => lm.player_id)
     const lp = players.filter(p => leaguePlayerIds.includes(p.id)).slice().sort(() => Math.random() - 0.5)
-    for (const tm of (league?.teams || [])) { await supabase.from('teams').delete().eq('id', tm.id) }
-    const half = Math.floor(lp.length / 2)
-    const team1 = lp.slice(0, half), team2 = lp.slice(half)
-    if (team1.length) await supabase.from('teams').insert({ league_id: leagueId, name: lang === 'en' ? 'Team 1' : 'Équipe 1', player1_id: team1[0]?.id || null, player2_id: team1[1]?.id || null })
-    if (team2.length) await supabase.from('teams').insert({ league_id: leagueId, name: lang === 'en' ? 'Team 2' : 'Équipe 2', player1_id: team2[0]?.id || null, player2_id: team2[1]?.id || null })
+    await supabase.from('teams').delete().eq('league_id', leagueId)
+    const newTeams = []
+    for (let i = 0; i < lp.length; i += 2) {
+      newTeams.push({ league_id: leagueId, name: (lang === 'en' ? 'Team ' : 'Équipe ') + (i / 2 + 1), player1_id: lp[i]?.id || null, player2_id: lp[i + 1]?.id || null })
+    }
+    if (newTeams.length) await supabase.from('teams').insert(newTeams)
     await loadLeagues(0)
   }
 
@@ -755,7 +801,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
                 myLeaveReqs={myLeaveReqs} resolveLeave={resolveLeave}
                 createFreeMatch={createFreeMatch} respondFreeMatch={respondFreeMatch}
                 setViewPlayerId={setViewPlayerId} setTab={setTab}
-                loadingBg={loadingBg}
+                loadingBg={loadingBg} matchConfirmations={matchConfirmations}
               />
             )}
             {tab === 'players' && !viewPlayerId && (
@@ -851,7 +897,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
 
 
 // ══ HOME ══
-function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatches, leagues, leagueMatches, myAdminLeagues, myLeaveReqs, resolveLeave, createFreeMatch, respondFreeMatch, setViewPlayerId, setTab, loadingBg }) {
+function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatches, leagues, leagueMatches, myAdminLeagues, myLeaveReqs, resolveLeave, createFreeMatch, respondFreeMatch, setViewPlayerId, setTab, loadingBg, matchConfirmations }) {
   const [showCreate, setShowCreate] = useState(false)
   const [respondingId, setRespondingId] = useState(null)
   const [resolvingId, setResolvingId] = useState(null)
@@ -912,24 +958,44 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
           <div style={{ padding: '0 16px 6px', fontSize: 11, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>⏳ {t.pendingMatches}</div>
           {pendingForMe.map(m => {
             const creator = players.find(p => p.id === m.creator_id)
-            const pids = [m.player1_id, m.player2_id, m.player3_id, m.player4_id]
+            const pids = [m.player1_id, m.player2_id, m.player3_id, m.player4_id].filter(Boolean)
+            const myConf = (matchConfirmations || []).find(c => c.match_id === m.id && c.player_id === me.id)
             const busyY = respondingId === m.id + '_y'
             const busyN = respondingId === m.id + '_n'
+            const nonCreatorIds = pids.filter(id => id !== m.creator_id)
+            const confirmedIds = (matchConfirmations || []).filter(c => c.match_id === m.id && c.confirmed).map(c => c.player_id)
+            const waitingFor = nonCreatorIds.filter(id => !confirmedIds.includes(id) && id !== me.id).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?')
             return (
               <div key={m.id} className="card card-yellow">
                 <div className="fw600 mb4" style={{ fontSize: 13 }}>{creator?.name} — {t.matchFree}</div>
                 <div className="text-xs mb8">{pids.map(id => players.find(p => p.id === id)?.name || '?').join(', ')}</div>
                 {m.sets?.length > 0 && <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 600, marginBottom: 8 }}>{m.sets.map(s => s.a + '-' + s.b).join('  ')}</div>}
-                <div className="row gap8">
-                  <button className="btn btn-primary btn-sm flex1" disabled={!!respondingId}
-                    onClick={() => handleRespond(m.id, true)}>
-                    {busyY ? <Spin /> : '✓'} {t.confirm}
-                  </button>
-                  <button className="btn btn-danger btn-sm flex1" disabled={!!respondingId}
-                    onClick={() => handleRespond(m.id, false)}>
-                    {busyN ? <Spin /> : '✕'} {t.refuse}
-                  </button>
-                </div>
+                {myConf ? (
+                  <div style={{ fontSize: 12, fontWeight: 600, padding: '4px 0' }}>
+                    <span style={{ color: myConf.confirmed ? '#10b981' : '#ef4444' }}>
+                      {myConf.confirmed ? '✓ ' + (lang === 'fr' ? 'Confirmé' : 'Confirmed') : '✕ ' + (lang === 'fr' ? 'Refusé' : 'Declined')}
+                    </span>
+                    {myConf.confirmed && waitingFor.length > 0 && (
+                      <span style={{ color: '#f59e0b', marginLeft: 8 }}>
+                        · {lang === 'fr' ? 'En attente de' : 'Waiting for'} {waitingFor.join(', ')}
+                      </span>
+                    )}
+                    {myConf.confirmed && waitingFor.length === 0 && (
+                      <span style={{ color: '#10b981', marginLeft: 8 }}>· {lang === 'fr' ? 'Tous ont confirmé ✓' : 'All confirmed ✓'}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="row gap8">
+                    <button className="btn btn-primary btn-sm flex1" disabled={!!respondingId}
+                      onClick={() => handleRespond(m.id, true)}>
+                      {busyY ? <Spin /> : '✓'} {t.confirm}
+                    </button>
+                    <button className="btn btn-danger btn-sm flex1" disabled={!!respondingId}
+                      onClick={() => handleRespond(m.id, false)}>
+                      {busyN ? <Spin /> : '✕'} {t.refuse}
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1066,7 +1132,10 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
                     onClick={isMe ? null : () => toggleSel(p.id)}>
                     <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid ' + (isSel ? '#7c3aed' : '#374151'), background: isSel ? '#7c3aed' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{isSel ? '✓' : ''}</div>
                     <Av size={32} photo={p.photo_url} name={p.name} />
-                    <span style={{ fontSize: 13, flex: 1 }}>{p.name}{isMe ? ' (moi)' : ''}{isFollowed ? ' 👥' : ''}</span>
+                    <div className="col" style={{ flex: 1 }}>
+                      <span style={{ fontSize: 13 }}>{p.name}{isMe ? ' (moi)' : ''}{isFollowed ? ' 👥' : ''}</span>
+                      <span style={{ fontSize: 10, color: '#9ca3af' }}>Niv.{p.level} · {p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0}% V</span>
+                    </div>
                     {isSel && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700 }}>{teamTag}</span>}
                   </div>
                 )
@@ -1186,13 +1255,23 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
 function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatches, leagues, leagueMatches, isFollowing, toggleFollow, submitRating, getMyRatingFor, onBack }) {
   const [showRating, setShowRating] = useState(false)
   const [followingBusy, setFollowingBusy] = useState(false)
+  const [allPlayerRatings, setAllPlayerRatings] = useState(null)
   const showToast = useToast()
+
+  useEffect(() => {
+    if (!player) return
+    setAllPlayerRatings(null)
+    supabase.from('ratings').select('*').eq('rated_id', player.id).then(({ data }) => {
+      if (data) setAllPlayerRatings(data)
+    })
+  }, [player?.id])
+
   if (!player) return <div className="empty">{lang === 'fr' ? 'Joueur introuvable' : 'Player not found'}</div>
 
   const isMe = player.id === me.id
   const isF = isFollowing(player.id)
   const info = getLevelInfo(player.level)
-  const pRatings = ratings.filter(r => r.rated_id === player.id)
+  const pRatings = allPlayerRatings ?? ratings.filter(r => r.rated_id === player.id)
   const badges = computeBadges(player, pRatings)
   const rl = RATING_LABELS[lang]
 
@@ -1748,10 +1827,32 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   const [saving, setSaving] = useState(false)
   const [drawing, setDrawing] = useState(false)
   const [balancing, setBalancing] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newP1, setNewP1] = useState('')
+  const [newP2, setNewP2] = useState('')
+  const [creating, setCreating] = useState(false)
   const showToast = useToast()
   const confirm = useConfirm()
   const leaguePlayerIds = (league.league_members || []).map(lm => lm.player_id)
   const leaguePlayers = players.filter(p => leaguePlayerIds.includes(p.id))
+
+  function playerOption(p) {
+    const wp = p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0
+    return `${p.name} · Niv.${p.level} · ${wp}% V`
+  }
+
+  async function handleCreate() {
+    if (!newName.trim()) return
+    setCreating(true)
+    try {
+      await supabase.from('teams').insert({ league_id: league.id, name: newName.trim(), player1_id: newP1 || null, player2_id: newP2 || null })
+      await loadLeagues(0)
+      showToast(t.saved, 'ok')
+      setShowCreate(false); setNewName(''); setNewP1(''); setNewP2('')
+    } catch { showToast(t.errorGeneric, 'err') }
+    setCreating(false)
+  }
 
   async function saveTeamEdit() {
     setSaving(true)
@@ -1777,11 +1878,12 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     setBalancing(true)
     try {
       const sorted = leaguePlayers.slice().sort((a, b) => b.level - a.level)
-      for (const tm of (league.teams || [])) { await supabase.from('teams').delete().eq('id', tm.id) }
-      const team1 = sorted.filter((_, i) => i % 2 === 0)
-      const team2 = sorted.filter((_, i) => i % 2 === 1)
-      if (team1.length) await supabase.from('teams').insert({ league_id: league.id, name: lang === 'en' ? 'Team 1' : 'Équipe 1', player1_id: team1[0]?.id || null, player2_id: team1[1]?.id || null })
-      if (team2.length) await supabase.from('teams').insert({ league_id: league.id, name: lang === 'en' ? 'Team 2' : 'Équipe 2', player1_id: team2[0]?.id || null, player2_id: team2[1]?.id || null })
+      await supabase.from('teams').delete().eq('league_id', league.id)
+      const newTeams = []
+      for (let i = 0; i < sorted.length; i += 2) {
+        newTeams.push({ league_id: league.id, name: (lang === 'en' ? 'Team ' : 'Équipe ') + (i / 2 + 1), player1_id: sorted[i]?.id || null, player2_id: sorted[i + 1]?.id || null })
+      }
+      if (newTeams.length) await supabase.from('teams').insert(newTeams)
       await loadLeagues(0)
       showToast(lang === 'fr' ? '⚖️ Équipes équilibrées !' : '⚖️ Teams balanced!', 'ok')
     } catch { showToast(t.errorGeneric, 'err') }
@@ -1796,11 +1898,34 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
   return (
     <div style={{ padding: '0 16px' }}>
       {canEdit && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-outline flex1" disabled={drawing} onClick={handleDraw}>{drawing ? <Spin /> : '🎲'} {t.randomDraw}</button>
           <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={balancing} onClick={handleBalance}>
             {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : 'Balance'}
           </button>
+          <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setShowCreate(true); setNewName(''); setNewP1(''); setNewP2('') }}>
+            + {lang === 'fr' ? 'Créer une équipe' : 'Create a team'}
+          </button>
+        </div>
+      )}
+      {showCreate && canEdit && (
+        <div className="card card-green mb8">
+          <div className="fw600 mb8" style={{ fontSize: 13 }}>{lang === 'fr' ? 'Nouvelle équipe' : 'New team'}</div>
+          <input className="input mb8" value={newName} onChange={e => setNewName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} maxLength={40} />
+          <select className="select mb8" value={newP1} onChange={e => setNewP1(e.target.value)}>
+            <option value="">{lang === 'en' ? 'Player 1 (optional)' : 'Joueur 1 (optionnel)'}</option>
+            {leaguePlayers.map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
+          </select>
+          <select className="select mb8" value={newP2} onChange={e => setNewP2(e.target.value)}>
+            <option value="">{lang === 'en' ? 'Player 2 (optional)' : 'Joueur 2 (optionnel)'}</option>
+            {leaguePlayers.filter(p => p.id !== newP1).map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
+          </select>
+          <div className="row gap8">
+            <button className="btn btn-outline flex1" onClick={() => setShowCreate(false)}>{t.cancelBtn}</button>
+            <button className="btn btn-primary flex1" disabled={!newName.trim() || creating} onClick={handleCreate}>
+              {creating ? <Spin /> : t.create}
+            </button>
+          </div>
         </div>
       )}
       {(league.teams || []).length === 0 && <div className="empty">{lang === 'en' ? 'No teams yet.' : 'Aucune équipe.'}</div>}
@@ -1816,11 +1941,11 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
                 <input className="input mb8" value={eName} onChange={e => setEName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} />
                 <select className="select mb8" value={eP1} onChange={e => setEP1(e.target.value)}>
                   <option value="">{lang === 'en' ? 'Player 1' : 'Joueur 1'}</option>
-                  {leaguePlayers.map(p => <option key={p.id} value={p.id}>{p.name} (Niv. {p.level})</option>)}
+                  {leaguePlayers.map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
                 </select>
                 <select className="select mb8" value={eP2} onChange={e => setEP2(e.target.value)}>
                   <option value="">{lang === 'en' ? 'Player 2' : 'Joueur 2'}</option>
-                  {leaguePlayers.filter(p => p.id !== eP1).map(p => <option key={p.id} value={p.id}>{p.name} (Niv. {p.level})</option>)}
+                  {leaguePlayers.filter(p => p.id !== eP1).map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
                 </select>
                 <div className="row gap8">
                   <button className="btn btn-outline flex1" onClick={() => setEditId(null)}>{t.cancelBtn}</button>
@@ -1834,7 +1959,9 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
                     <div className="fw600" style={{ fontSize: 13 }}>{tm.name}</div>
                     {avg && <span style={{ fontSize: 10, color: '#a855f7', background: 'rgba(139,92,246,0.15)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>moy. {avg}</span>}
                   </div>
-                  <div className="text-xs">{p1 ? p1.name + ' (Niv. ' + p1.level + ')' : '?'} & {p2 ? p2.name + ' (Niv. ' + p2.level + ')' : '?'}</div>
+                  <div className="text-xs">
+                    {p1 ? `${p1.name} · Niv.${p1.level} · ${p1.matches > 0 ? Math.round(p1.wins / p1.matches * 100) : 0}%V` : '?'} &amp; {p2 ? `${p2.name} · Niv.${p2.level} · ${p2.matches > 0 ? Math.round(p2.wins / p2.matches * 100) : 0}%V` : '?'}
+                  </div>
                 </div>
                 {canEdit && (
                   <button className="btn btn-outline btn-sm" onClick={() => { setEditId(tm.id); setEName(tm.name); setEP1(tm.player1_id || ''); setEP2(tm.player2_id || '') }}>✏️</button>
