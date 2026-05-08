@@ -224,6 +224,7 @@ const T = {
     matchConfirmed:'✓ Match confirmé !',matchRefused:'Match refusé.',
     leagueJoined:'✓ Ligue rejointe !',leagueLeft:'Demande de sortie envoyée.',
     wrongCode:'Code incorrect.',nameRequired:'Nom trop court (min. 2 car.).',cityRequired:'Ville requise.',
+    maxPlayers:'Limite de joueurs',maxPlayersHint:'0 = illimité',leagueFull:'La ligue est complète',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -276,6 +277,7 @@ const T = {
     matchConfirmed:'✓ Match confirmed!',matchRefused:'Match declined.',
     leagueJoined:'✓ League joined!',leagueLeft:'Leave request sent.',
     wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
+    maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
   }
 }
 
@@ -716,7 +718,8 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
       name: data.name, season: data.season, rules: data.rules,
       sets_per_match: data.setsPerMatch, match_duration: data.matchDuration,
       min_age: data.minAge, is_private: data.isPrivate,
-      access_code_hash: data.isPrivate ? data.code : null, admin_id: me.id
+      access_code_hash: data.isPrivate ? data.code : null, admin_id: me.id,
+      max_players: data.maxPlayers || 0
     }).select().single()
     if (error) throw error
     await supabase.from('league_members').insert({ league_id: newL.id, player_id: me.id, role: 'admin' })
@@ -724,8 +727,14 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   }
 
   async function joinLeague(leagueId) {
-    const already = leagues.find(l => l.id === leagueId)?.league_members?.some(lm => lm.player_id === me.id)
+    const league = leagues.find(l => l.id === leagueId)
+    const already = league?.league_members?.some(lm => lm.player_id === me.id)
     if (already) return
+    const memberCount = league?.league_members?.length || 0
+    const maxPlayers = league?.max_players || 0
+    if (maxPlayers > 0 && memberCount >= maxPlayers) {
+      throw new Error(lang === 'en' ? 'League is full' : 'La ligue est complète')
+    }
     const { error } = await supabase.from('league_members').insert({ league_id: leagueId, player_id: me.id, role: 'member' })
     if (error) throw error
     await loadLeagues(0)
@@ -1460,24 +1469,34 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
 
   function renderLeague(l) {
     const isMem = l.league_members?.some(lm => lm.player_id === me.id)
+    const memberCount = l.league_members?.length || 0
+    const maxPlayers = l.max_players || 0
+    const isFull = maxPlayers > 0 && memberCount >= maxPlayers
+    const memberLabel = maxPlayers > 0 ? `${memberCount}/${maxPlayers} ${t.memberCount}` : `${memberCount} ${t.memberCount}`
     return (
       <div key={l.id} className="card card-purple">
         <div style={{ cursor: 'pointer' }} onClick={() => isMem ? setViewLeagueId(l.id) : setPreviewLeagueId(l.id)}>
           <div className="row mb4">
             <div className="fw700 flex1" style={{ fontSize: 15 }}>{l.is_private ? '🔒 ' : '🌍 '}{l.name}</div>
             {isMem && <span style={{ fontSize: 10, color: '#10b981', fontWeight: 700 }}>✓ {lang === 'en' ? 'Member' : 'Membre'}</span>}
+            {!isMem && isFull && <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>🔴 {t.leagueFull}</span>}
           </div>
           <div className="text-sm mb4">{l.season}</div>
           <div style={{ display: 'flex', gap: 12, marginBottom: isMem ? 0 : 8 }}>
-            <span className="text-xs">{l.league_members?.length || 0} {t.memberCount}</span>
+            <span className="text-xs">{memberLabel}</span>
             <span className="text-xs">{t.duration}: {l.match_duration}min</span>
             <span className="text-xs">{t.minAgeShort}: {l.min_age}ans</span>
           </div>
         </div>
-        {!isMem && (
+        {!isMem && !isFull && (
           <button className="btn btn-green btn-sm" style={{ width: '100%' }} onClick={() => setPreviewLeagueId(l.id)}>
             {l.is_private ? '🔒 ' : '🌍 '}{t.joinLeague}
           </button>
+        )}
+        {!isMem && isFull && (
+          <div style={{ width: '100%', textAlign: 'center', padding: '8px 0', fontSize: 12, color: '#ef4444', fontWeight: 700 }}>
+            🔴 {t.leagueFull}
+          </div>
         )}
       </div>
     )
@@ -1519,6 +1538,9 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
   const showToast = useToast()
   const isMem = league.league_members?.some(lm => lm.player_id === me.id)
   const admin = players.find(p => p.id === league.admin_id)
+  const memberCount = league.league_members?.length || 0
+  const maxPlayers = league.max_players || 0
+  const isFull = maxPlayers > 0 && memberCount >= maxPlayers
 
   async function doJoin() {
     if (league.is_private) {
@@ -1548,7 +1570,7 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
         <div className="fw700 mb4" style={{ fontSize: 16 }}>{league.name}</div>
         <div className="text-sm mb8">{league.season}</div>
         <div className="grid2" style={{ marginBottom: 12 }}>
-          <div className="stat-box"><div className="stat-val">{league.league_members?.length || 0}</div><div className="stat-lbl">{t.memberCount}</div></div>
+          <div className="stat-box"><div className="stat-val">{maxPlayers > 0 ? `${memberCount}/${maxPlayers}` : memberCount}</div><div className="stat-lbl">{t.memberCount}</div></div>
           <div className="stat-box"><div className="stat-val">{league.sets_per_match}</div><div className="stat-lbl">{t.setsPerMatch}</div></div>
           <div className="stat-box"><div className="stat-val">{league.match_duration}'</div><div className="stat-lbl">{t.duration}</div></div>
           <div className="stat-box"><div className="stat-val">{league.min_age}+</div><div className="stat-lbl">{t.minAgeShort}</div></div>
@@ -1576,7 +1598,7 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
           </div>
         )
       })}
-      {!isMem && (
+      {!isMem && !isFull && (
         <div style={{ padding: '12px 16px' }}>
           {league.is_private && (
             <div style={{ marginBottom: 10 }}>
@@ -1589,6 +1611,11 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
           <button className="btn btn-primary" style={{ width: '100%' }} disabled={joining} onClick={doJoin}>
             {joining ? <Spin /> : '✅'} {t.confirmJoin}
           </button>
+        </div>
+      )}
+      {!isMem && isFull && (
+        <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#ef4444' }}>
+          🔴 {t.leagueFull}
         </div>
       )}
       {isMem && (
@@ -1604,7 +1631,7 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
 
 // ══ CREATE LEAGUE MODAL ══
 function CreateLeagueModal({ t, lang, onCreate, onClose }) {
-  const [form, setForm] = useState({ name: '', season: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, isPrivate: false, code: '' })
+  const [form, setForm] = useState({ name: '', season: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, maxPlayers: 0, isPrivate: false, code: '' })
   const [saving, setSaving] = useState(false)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
@@ -1634,9 +1661,15 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
               <input className="input" type="number" value={form.matchDuration} onChange={e => set('matchDuration', parseInt(e.target.value) || 90)} />
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.minAge}</div>
-            <input className="input" type="number" value={form.minAge} onChange={e => set('minAge', parseInt(e.target.value) || 0)} />
+          <div className="row gap8">
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.minAge}</div>
+              <input className="input" type="number" value={form.minAge} onChange={e => set('minAge', parseInt(e.target.value) || 0)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.maxPlayers} <span style={{ color: '#4b5563' }}>({t.maxPlayersHint})</span></div>
+              <input className="input" type="number" min={0} value={form.maxPlayers} onChange={e => set('maxPlayers', parseInt(e.target.value) || 0)} />
+            </div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px' }}>
             <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.visibilityLabel}</div>
