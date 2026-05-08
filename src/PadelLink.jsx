@@ -3,8 +3,9 @@ import { supabase } from './supabase'
 
 const STYLES = `
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Plus Jakarta Sans',sans-serif;background:#0a0a0f;color:#fff;}
-  .app{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:#0e0e16;}
+  html,body{width:100%;overflow-x:hidden;}
+  body{font-family:'Plus Jakarta Sans',sans-serif;background:#0e0e16;color:#fff;}
+  .app{width:100%;max-width:430px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:#0e0e16;}
   .header{background:linear-gradient(135deg,#1a0a2e 0%,#0d0d1a 100%);padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(139,92,246,0.3);position:sticky;top:0;z-index:100;}
   .header-logo{font-family:'Bebas Neue',cursive;font-size:26px;letter-spacing:2px;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .header-right{display:flex;align-items:center;gap:10px;}
@@ -382,6 +383,44 @@ function SetsPreview({ sets, t1name, t2name }) {
         {sets.map((s, i) => <div key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '4px 12px', fontFamily: "'Bebas Neue',cursive", fontSize: 20, color: s.a > s.b ? '#06b6d4' : s.b > s.a ? '#a855f7' : '#9ca3af' }}>{s.a}-{s.b}</div>)}
       </div>
       {win && <div style={{ textAlign: 'center', marginTop: 6, fontSize: 12, fontWeight: 700, color: '#10b981' }}>🏆 {win}</div>}
+    </div>
+  )
+}
+
+// ── Searchable player picker ──
+function PlayerPicker({ players, value, onChange, placeholder, excludeIds = [], lang }) {
+  const [search, setSearch] = useState('')
+  const selected = players.find(p => p.id === value)
+  const filtered = players.filter(p =>
+    !excludeIds.includes(p.id) &&
+    (search.length < 1 || p.name.toLowerCase().includes(search.toLowerCase()) || (p.city || '').toLowerCase().includes(search.toLowerCase()))
+  )
+  const wp = p => p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {selected ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{selected.name} · Niv.{selected.level} · {wp(selected)}%V</span>
+          <button style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 18, lineHeight: 1 }} onClick={() => { onChange(''); setSearch('') }}>✕</button>
+        </div>
+      ) : (
+        <input className="input" style={{ marginBottom: 4 }} placeholder={'🔍 ' + placeholder}
+          value={search} onChange={e => setSearch(e.target.value)} />
+      )}
+      {!selected && search.length >= 1 && (
+        <div style={{ maxHeight: 160, overflowY: 'auto', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10 }}>
+          {filtered.length === 0
+            ? <div style={{ padding: '10px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : 'No player found'}</div>
+            : filtered.map(p => (
+              <div key={p.id} style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 13 }}
+                onMouseDown={() => { onChange(p.id); setSearch('') }}>
+                <span style={{ fontWeight: 600 }}>{p.name}</span>
+                <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 6 }}>Niv.{p.level} · {wp(p)}%V · {p.city}</span>
+              </div>
+            ))
+          }
+        </div>
+      )}
     </div>
   )
 }
@@ -1086,8 +1125,8 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
   const [date, setDate] = useState('')
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
   const showToast = useToast()
-  const myLeagues = leagues.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
 
   function toggleSel(pid) {
     setSel(prev => {
@@ -1103,6 +1142,9 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
   const t1names = sel.slice(0, 2).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
   const t2names = sel.slice(2, 4).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
   const allSelectable = [me, ...players.filter(p => p.id !== me.id)]
+  const filtered = search.trim().length >= 1
+    ? allSelectable.filter(p => p.id === me.id || p.name.toLowerCase().includes(search.toLowerCase()) || (p.city || '').toLowerCase().includes(search.toLowerCase()))
+    : allSelectable
 
   async function handleCreate() {
     if (saving) return
@@ -1118,30 +1160,33 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
         <div className="modal-title">⚡ {t.createMatch}</div>
         {step === 1 && (
           <div>
-            <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 8 }}>{t.chooseTeams}</div>
+            <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginBottom: 6 }}>{t.chooseTeams}</div>
             <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 8 }}>{lang === 'fr' ? 'Éq.1 = joueurs 1&2 · Éq.2 = joueurs 3&4' : 'Team1 = players 1&2 · Team2 = players 3&4'}</div>
-            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-              {allSelectable.map(p => {
+            <input className="input" style={{ marginBottom: 8 }} placeholder={'🔍 ' + (lang === 'fr' ? 'Rechercher un joueur...' : 'Search player...')}
+              value={search} onChange={e => setSearch(e.target.value)} />
+            <div style={{ maxHeight: 240, overflowY: 'auto', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+              {filtered.map(p => {
                 const isSel = sel.includes(p.id)
                 const isMe = p.id === me.id
                 const idx = sel.indexOf(p.id)
                 const teamTag = idx === 0 || idx === 1 ? '🔵 Éq.1' : idx === 2 || idx === 3 ? '🟣 Éq.2' : ''
                 const isFollowed = followedPlayers.some(fp => fp.id === p.id)
                 return (
-                  <div key={p.id} className="row" style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: isMe ? 'default' : 'pointer', opacity: isMe ? 0.5 : 1 }}
+                  <div key={p.id} className="row" style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: isMe ? 'default' : 'pointer', opacity: isMe ? 0.5 : 1, background: isSel ? 'rgba(124,58,237,0.1)' : 'transparent' }}
                     onClick={isMe ? null : () => toggleSel(p.id)}>
-                    <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid ' + (isSel ? '#7c3aed' : '#374151'), background: isSel ? '#7c3aed' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{isSel ? '✓' : ''}</div>
-                    <Av size={32} photo={p.photo_url} name={p.name} />
+                    <div style={{ width: 20, height: 20, borderRadius: 5, border: '2px solid ' + (isSel ? '#7c3aed' : '#374151'), background: isSel ? '#7c3aed' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, flexShrink: 0 }}>{isSel ? '✓' : ''}</div>
+                    <Av size={30} photo={p.photo_url} name={p.name} />
                     <div className="col" style={{ flex: 1 }}>
                       <span style={{ fontSize: 13 }}>{p.name}{isMe ? ' (moi)' : ''}{isFollowed ? ' 👥' : ''}</span>
-                      <span style={{ fontSize: 10, color: '#9ca3af' }}>Niv.{p.level} · {p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0}% V</span>
+                      <span style={{ fontSize: 10, color: '#9ca3af' }}>Niv.{p.level} · {p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0}%V · {p.city}</span>
                     </div>
-                    {isSel && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700 }}>{teamTag}</span>}
+                    {isSel && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700, flexShrink: 0 }}>{teamTag}</span>}
                   </div>
                 )
               })}
+              {filtered.length === 0 && <div style={{ padding: '12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : 'No player found'}</div>}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 12px' }}>{sel.length}/4 {t.players} · 👥 = {lang === 'fr' ? 'joueur suivi' : 'followed player'}</div>
+            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 8px' }}>{sel.length}/4 · 👥 = {lang === 'fr' ? 'joueur suivi' : 'followed'}</div>
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <div className="row gap8">
               <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
@@ -1854,6 +1899,16 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     setCreating(false)
   }
 
+  async function handleDelete(teamId) {
+    const ok = await confirm(lang === 'fr' ? 'Supprimer cette équipe ?' : 'Delete this team?')
+    if (!ok) return
+    try {
+      await supabase.from('teams').delete().eq('id', teamId)
+      await loadLeagues(0)
+      showToast(lang === 'fr' ? 'Équipe supprimée' : 'Team deleted', 'ok')
+    } catch { showToast(t.errorGeneric, 'err') }
+  }
+
   async function saveTeamEdit() {
     setSaving(true)
     await supabase.from('teams').update({ name: eName, player1_id: eP1 || null, player2_id: eP2 || null }).eq('id', editId)
@@ -1895,6 +1950,10 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
     return lvls.length ? (lvls.reduce((a, b) => a + b, 0) / lvls.length).toFixed(1) : null
   }
 
+  const allAssigned = leaguePlayers.length > 0 && leaguePlayers.every(p =>
+    (league.teams || []).some(tm => tm.player1_id === p.id || tm.player2_id === p.id)
+  )
+
   return (
     <div style={{ padding: '0 16px' }}>
       {canEdit && (
@@ -1903,24 +1962,24 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
           <button style={{ flex: 1, background: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)', color: '#06b6d4', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} disabled={balancing} onClick={handleBalance}>
             {balancing ? <Spin /> : '⚖️'} {lang === 'fr' ? 'Équilibrer' : 'Balance'}
           </button>
-          <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setShowCreate(true); setNewName(''); setNewP1(''); setNewP2('') }}>
-            + {lang === 'fr' ? 'Créer une équipe' : 'Create a team'}
-          </button>
+          {!allAssigned && (
+            <button className="btn btn-green" style={{ width: '100%' }} onClick={() => { setShowCreate(true); setNewName(''); setNewP1(''); setNewP2('') }}>
+              + {lang === 'fr' ? 'Créer une équipe' : 'Create a team'}
+            </button>
+          )}
         </div>
       )}
       {showCreate && canEdit && (
         <div className="card card-green mb8">
           <div className="fw600 mb8" style={{ fontSize: 13 }}>{lang === 'fr' ? 'Nouvelle équipe' : 'New team'}</div>
           <input className="input mb8" value={newName} onChange={e => setNewName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} maxLength={40} />
-          <select className="select mb8" value={newP1} onChange={e => setNewP1(e.target.value)}>
-            <option value="">{lang === 'en' ? 'Player 1 (optional)' : 'Joueur 1 (optionnel)'}</option>
-            {leaguePlayers.map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
-          </select>
-          <select className="select mb8" value={newP2} onChange={e => setNewP2(e.target.value)}>
-            <option value="">{lang === 'en' ? 'Player 2 (optional)' : 'Joueur 2 (optionnel)'}</option>
-            {leaguePlayers.filter(p => p.id !== newP1).map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
-          </select>
-          <div className="row gap8">
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : 'Player 1'}</div>
+          <PlayerPicker players={leaguePlayers} value={newP1} onChange={setNewP1}
+            placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : 'Search player 1...'} excludeIds={newP2 ? [newP2] : []} lang={lang} />
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 2' : 'Player 2'}</div>
+          <PlayerPicker players={leaguePlayers} value={newP2} onChange={setNewP2}
+            placeholder={lang === 'fr' ? 'Rechercher joueur 2...' : 'Search player 2...'} excludeIds={newP1 ? [newP1] : []} lang={lang} />
+          <div className="row gap8 mt8">
             <button className="btn btn-outline flex1" onClick={() => setShowCreate(false)}>{t.cancelBtn}</button>
             <button className="btn btn-primary flex1" disabled={!newName.trim() || creating} onClick={handleCreate}>
               {creating ? <Spin /> : t.create}
@@ -1939,32 +1998,33 @@ function LeagueTeamsTab({ t, lang, league, players, isAdmin, isSubAdmin, randomD
             {isEd ? (
               <div>
                 <input className="input mb8" value={eName} onChange={e => setEName(e.target.value)} placeholder={lang === 'en' ? 'Team name' : "Nom de l'équipe"} />
-                <select className="select mb8" value={eP1} onChange={e => setEP1(e.target.value)}>
-                  <option value="">{lang === 'en' ? 'Player 1' : 'Joueur 1'}</option>
-                  {leaguePlayers.map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
-                </select>
-                <select className="select mb8" value={eP2} onChange={e => setEP2(e.target.value)}>
-                  <option value="">{lang === 'en' ? 'Player 2' : 'Joueur 2'}</option>
-                  {leaguePlayers.filter(p => p.id !== eP1).map(p => <option key={p.id} value={p.id}>{playerOption(p)}</option>)}
-                </select>
-                <div className="row gap8">
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 1' : 'Player 1'}</div>
+                <PlayerPicker players={leaguePlayers} value={eP1} onChange={setEP1}
+                  placeholder={lang === 'fr' ? 'Rechercher joueur 1...' : 'Search player 1...'} excludeIds={eP2 ? [eP2] : []} lang={lang} />
+                <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{lang === 'fr' ? 'Joueur 2' : 'Player 2'}</div>
+                <PlayerPicker players={leaguePlayers} value={eP2} onChange={setEP2}
+                  placeholder={lang === 'fr' ? 'Rechercher joueur 2...' : 'Search player 2...'} excludeIds={eP1 ? [eP1] : []} lang={lang} />
+                <div className="row gap8 mt8">
                   <button className="btn btn-outline flex1" onClick={() => setEditId(null)}>{t.cancelBtn}</button>
                   <button className="btn btn-primary flex1" disabled={saving} onClick={saveTeamEdit}>{saving ? <Spin /> : t.saveBtn}</button>
                 </div>
               </div>
             ) : (
               <div className="row" style={{ justifyContent: 'space-between' }}>
-                <div className="col">
+                <div className="col" style={{ flex: 1 }}>
                   <div className="row gap4">
                     <div className="fw600" style={{ fontSize: 13 }}>{tm.name}</div>
                     {avg && <span style={{ fontSize: 10, color: '#a855f7', background: 'rgba(139,92,246,0.15)', padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>moy. {avg}</span>}
                   </div>
                   <div className="text-xs">
-                    {p1 ? `${p1.name} · Niv.${p1.level} · ${p1.matches > 0 ? Math.round(p1.wins / p1.matches * 100) : 0}%V` : '?'} &amp; {p2 ? `${p2.name} · Niv.${p2.level} · ${p2.matches > 0 ? Math.round(p2.wins / p2.matches * 100) : 0}%V` : '?'}
+                    {p1 ? `${p1.name} · ${p1.level} · ${p1.matches > 0 ? Math.round(p1.wins / p1.matches * 100) : 0}%V` : '—'} &amp; {p2 ? `${p2.name} · ${p2.level} · ${p2.matches > 0 ? Math.round(p2.wins / p2.matches * 100) : 0}%V` : '—'}
                   </div>
                 </div>
                 {canEdit && (
-                  <button className="btn btn-outline btn-sm" onClick={() => { setEditId(tm.id); setEName(tm.name); setEP1(tm.player1_id || ''); setEP2(tm.player2_id || '') }}>✏️</button>
+                  <div className="row gap4">
+                    <button className="btn btn-outline btn-sm" onClick={() => { setEditId(tm.id); setEName(tm.name); setEP1(tm.player1_id || ''); setEP2(tm.player2_id || '') }}>✏️</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(tm.id)}>🗑️</button>
+                  </div>
                 )}
               </div>
             )}
