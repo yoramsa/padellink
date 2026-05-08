@@ -2230,7 +2230,7 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
   }
 
   const myRank = sorted.findIndex(p => p.id === me.id)
-  const windowStart = Math.max(0, Math.min(myRank - 7, sorted.length - 15))
+  const windowStart = myRank < 15 ? 0 : Math.max(0, Math.min(myRank - 7, sorted.length - 15))
   const visible = sorted.slice(windowStart, windowStart + 15)
 
   return (
