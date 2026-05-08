@@ -226,6 +226,8 @@ const T = {
     leagueJoined:'✓ Ligue rejointe !',leagueLeft:'Demande de sortie envoyée.',
     wrongCode:'Code incorrect.',nameRequired:'Nom trop court (min. 2 car.).',cityRequired:'Ville requise.',
     maxPlayers:'Limite de joueurs',maxPlayersHint:'0 = illimité',leagueFull:'La ligue est complète',
+    leagueFormError:'Vous devez remplir toutes les cases pour pouvoir créer la ligue.',
+    durationHint:'0 = illimité',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -279,6 +281,8 @@ const T = {
     leagueJoined:'✓ League joined!',leagueLeft:'Leave request sent.',
     wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
     maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
+    leagueFormError:'You must fill all fields to create the league.',
+    durationHint:'0 = unlimited',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
@@ -332,6 +336,8 @@ const T = {
     leagueJoined:'✓ הצטרפת לליגה!',leagueLeft:'בקשת עזיבה נשלחה.',
     wrongCode:'קוד שגוי.',nameRequired:'שם קצר מדי (מינ. 2 תווים).',cityRequired:'עיר נדרשת.',
     maxPlayers:'מגבלת שחקנים',maxPlayersHint:'0 = ללא הגבלה',leagueFull:'הליגה מלאה',
+    leagueFormError:'עליך למלא את כל השדות כדי ליצור את הליגה.',
+    durationHint:'0 = ללא הגבלה',
   }
 }
 
@@ -1691,10 +1697,19 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
 function CreateLeagueModal({ t, lang, onCreate, onClose }) {
   const [form, setForm] = useState({ name: '', season: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, maxPlayers: 0, isPrivate: false, code: '' })
   const [saving, setSaving] = useState(false)
-  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+  const [formError, setFormError] = useState('')
+  const set = (k, v) => { setFormError(''); setForm(p => ({ ...p, [k]: v })) }
+
+  function parseNum(val, fallback = 0) {
+    const n = parseInt(val, 10)
+    return isNaN(n) ? fallback : n
+  }
 
   async function handleCreate() {
-    if (!form.name.trim() || !form.season.trim()) return
+    if (!form.name.trim() || !form.season.trim()) {
+      setFormError(t.leagueFormError)
+      return
+    }
     setSaving(true)
     try { await onCreate(form) } finally { setSaving(false) }
   }
@@ -1704,8 +1719,8 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">+ {t.createLeague}</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input className="input" placeholder={t.leagueName} maxLength={50} value={form.name} onChange={e => set('name', e.target.value)} />
-          <input className="input" placeholder={t.season} maxLength={50} value={form.season} onChange={e => set('season', e.target.value)} />
+          <input className="input" placeholder={t.leagueName + ' *'} maxLength={50} value={form.name} onChange={e => set('name', e.target.value)} />
+          <input className="input" placeholder={t.season + ' *'} maxLength={50} value={form.season} onChange={e => set('season', e.target.value)} />
           <textarea className="input" placeholder={t.rules} value={form.rules} rows={3} maxLength={500} onChange={e => set('rules', e.target.value)} style={{ resize: 'none' }} />
           <div className="row gap8">
             <div style={{ flex: 1 }}>
@@ -1715,18 +1730,18 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.matchDuration}</div>
-              <input className="input" type="number" value={form.matchDuration} onChange={e => set('matchDuration', parseInt(e.target.value) || 90)} />
+              <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.matchDuration} <span style={{ color: '#4b5563' }}>({t.durationHint})</span></div>
+              <input className="input" type="number" min={0} value={form.matchDuration} onChange={e => set('matchDuration', parseNum(e.target.value))} />
             </div>
           </div>
           <div className="row gap8">
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.minAge}</div>
-              <input className="input" type="number" value={form.minAge} onChange={e => set('minAge', parseInt(e.target.value) || 0)} />
+              <input className="input" type="number" value={form.minAge} onChange={e => set('minAge', parseNum(e.target.value))} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>{t.maxPlayers} <span style={{ color: '#4b5563' }}>({t.maxPlayersHint})</span></div>
-              <input className="input" type="number" min={0} value={form.maxPlayers} onChange={e => set('maxPlayers', parseInt(e.target.value) || 0)} />
+              <input className="input" type="number" min={0} value={form.maxPlayers} onChange={e => set('maxPlayers', parseNum(e.target.value))} />
             </div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px' }}>
@@ -1737,10 +1752,15 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
               maxLength={10} value={form.code}
               onChange={e => set('code', e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10))} />}
           </div>
+          {formError && (
+            <div style={{ padding: '10px 12px', borderRadius: 10, fontSize: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
+              {formError}
+            </div>
+          )}
         </div>
         <div className="row gap8 mt12">
           <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-          <button className="btn btn-primary flex1" disabled={!form.name || !form.season || saving} onClick={handleCreate}>
+          <button className="btn btn-primary flex1" disabled={saving} onClick={handleCreate}>
             {saving ? <Spin /> : null} {t.create}
           </button>
         </div>
