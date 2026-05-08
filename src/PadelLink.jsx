@@ -495,8 +495,10 @@ function SkeletonCard({ lines = 2 }) {
 // ══════════════════════════════════════════
 // MAIN APP
 // ══════════════════════════════════════════
-export default function PadelLink({ session, player: initialPlayer, pendingLeagueId, onClearPendingLeague, onSignOut }) {
-  const [lang, setLang] = useState('fr')
+const LANG_LABELS = { fr: '🇫🇷 FR', en: '🇬🇧 EN', he: '🇮🇱 HE' }
+const ALL_LANGS = ['fr', 'en', 'he']
+
+export default function PadelLink({ session, player: initialPlayer, pendingLeagueId, onClearPendingLeague, onSignOut, lang, setLang }) {
   const [tab, setTab] = useState('home')
   const [me, setMe] = useState(initialPlayer)
   const [players, setPlayers] = useState([])
@@ -891,7 +893,9 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
             <span className="header-logo">PadelLink</span>
             <div className="header-right">
               {totalNotifs > 0 && <div className="notif-dot">{totalNotifs}</div>}
-              <button className="lang-btn" onClick={() => setLang(lang === 'fr' ? 'en' : lang === 'en' ? 'he' : 'fr')}>{lang === 'fr' ? '🇬🇧 EN' : lang === 'en' ? '🇮🇱 HE' : '🇫🇷 FR'}</button>
+              {ALL_LANGS.filter(l => l !== lang).map(l => (
+                <button key={l} className="lang-btn" onClick={() => setLang(l)}>{LANG_LABELS[l]}</button>
+              ))}
             </div>
           </div>
 

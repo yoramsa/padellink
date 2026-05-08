@@ -9,6 +9,9 @@ export default function App() {
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [pendingLeagueId, setPendingLeagueId] = useState(null)
+  const [lang, setLangState] = useState(() => localStorage.getItem('pl_lang') || 'en')
+
+  function setLang(l) { setLangState(l); localStorage.setItem('pl_lang', l) }
 
   useEffect(function() {
     const params = new URLSearchParams(window.location.search)
@@ -51,8 +54,8 @@ export default function App() {
     </div>
   )
 
-  if (!session) return <Auth />
-  if (!player) return <CreateProfile session={session} onCreated={() => loadPlayer(session.user.id)} />
+  if (!session) return <Auth lang={lang} setLang={setLang} />
+  if (!player) return <CreateProfile session={session} onCreated={() => loadPlayer(session.user.id)} lang={lang} setLang={setLang} />
 
   return (
     <PadelLink
@@ -61,6 +64,8 @@ export default function App() {
       pendingLeagueId={pendingLeagueId}
       onClearPendingLeague={() => setPendingLeagueId(null)}
       onSignOut={() => supabase.auth.signOut()}
+      lang={lang}
+      setLang={setLang}
     />
   )
 }

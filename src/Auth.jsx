@@ -5,8 +5,9 @@ const STYLES = `
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:'Plus Jakarta Sans',sans-serif;background:#0a0a0f;color:#fff;}
   .auth-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0e0e16;padding:24px;}
-  .auth-logo{font-family:'Bebas Neue',cursive;font-size:48px;letter-spacing:4px;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;}
-  .auth-sub{font-size:13px;color:#6b7280;margin-bottom:40px;letter-spacing:1px;}
+  .auth-top{width:100%;max-width:380px;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+  .auth-logo{font-family:'Bebas Neue',cursive;font-size:48px;letter-spacing:4px;background:linear-gradient(135deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .auth-sub{font-size:13px;color:#6b7280;margin-bottom:40px;letter-spacing:1px;width:100%;max-width:380px;}
   .auth-card{background:rgba(255,255,255,0.04);border:1px solid rgba(139,92,246,0.3);border-radius:20px;padding:28px 24px;width:100%;max-width:380px;}
   .auth-title{font-size:18px;font-weight:700;margin-bottom:6px;}
   .auth-desc{font-size:12px;color:#6b7280;margin-bottom:24px;line-height:1.6;}
@@ -19,17 +20,57 @@ const STYLES = `
   .msg{margin-top:14px;padding:10px 14px;border-radius:10px;font-size:12px;text-align:center;}
   .msg-success{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;}
   .msg-error{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;}
+  .lang-btns{display:flex;gap:6px;}
+  .lang-btn{background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#a855f7;padding:4px 8px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;}
 `
 
-export default function Auth() {
+const T = {
+  fr: {
+    subtitle: 'LA COMMUNAUTÉ PADEL EN ISRAËL',
+    title: '👋 Connexion',
+    desc: 'Entre ton email et reçois un lien magique — pas de mot de passe à retenir.',
+    emailError: 'Entre une adresse email valide.',
+    sending: '⏳ Envoi...',
+    sendBtn: '✉️ Envoyer le lien magique',
+    sent: '✉️ Lien envoyé ! Vérifie ta boîte mail et clique sur le lien pour te connecter.',
+    firstLogin: 'Première connexion = création automatique de ton compte',
+  },
+  en: {
+    subtitle: 'THE PADEL COMMUNITY IN ISRAEL',
+    title: '👋 Sign in',
+    desc: 'Enter your email and receive a magic link — no password to remember.',
+    emailError: 'Enter a valid email address.',
+    sending: '⏳ Sending...',
+    sendBtn: '✉️ Send magic link',
+    sent: '✉️ Link sent! Check your inbox and click the link to sign in.',
+    firstLogin: 'First login = automatic account creation',
+  },
+  he: {
+    subtitle: 'קהילת הפאדל בישראל',
+    title: '👋 כניסה',
+    desc: 'הכנס את המייל שלך וקבל קישור קסם — ללא סיסמה.',
+    emailError: 'הכנס כתובת מייל תקינה.',
+    sending: '⏳ שולח...',
+    sendBtn: '✉️ שלח קישור קסם',
+    sent: '✉️ קישור נשלח! בדוק את תיבת הדואר שלך ולחץ על הקישור.',
+    firstLogin: 'כניסה ראשונה = יצירת חשבון אוטומטית',
+  }
+}
+
+const LANG_LABELS = { fr: '🇫🇷 FR', en: '🇬🇧 EN', he: '🇮🇱 HE' }
+const ALL_LANGS = ['fr', 'en', 'he']
+
+export default function Auth({ lang, setLang }) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
   const [isError, setIsError] = useState(false)
 
+  const t = T[lang] || T.en
+
   async function handleMagicLink() {
     if (!email || !email.includes('@')) {
-      setMessage('Entre une adresse email valide.')
+      setMessage(t.emailError)
       setIsError(true)
       return
     }
@@ -44,25 +85,30 @@ export default function Auth() {
       setMessage(error.message)
       setIsError(true)
     } else {
-      setMessage('✉️ Lien envoyé ! Vérifie ta boîte mail et clique sur le lien pour te connecter.')
+      setMessage(t.sent)
       setIsError(false)
     }
   }
 
   return (
-    <div>
+    <div dir={lang === 'he' ? 'rtl' : 'ltr'}>
       <style>{STYLES}</style>
       <div className="auth-wrap">
-        <div className="auth-logo">PadelLink</div>
-        <div className="auth-sub">LA COMMUNAUTÉ PADEL EN ISRAËL</div>
-        <div className="auth-card">
-          <div className="auth-title">👋 Connexion</div>
-          <div className="auth-desc">
-            Entre ton email et reçois un lien magique — pas de mot de passe à retenir.
+        <div className="auth-top">
+          <div className="auth-logo">PadelLink</div>
+          <div className="lang-btns">
+            {ALL_LANGS.filter(l => l !== lang).map(l => (
+              <button key={l} className="lang-btn" onClick={() => setLang(l)}>{LANG_LABELS[l]}</button>
+            ))}
           </div>
+        </div>
+        <div className="auth-sub">{t.subtitle}</div>
+        <div className="auth-card">
+          <div className="auth-title">{t.title}</div>
+          <div className="auth-desc">{t.desc}</div>
           <input
             className="input"
-            placeholder="ton@email.com"
+            placeholder="email@example.com"
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -73,7 +119,7 @@ export default function Auth() {
             disabled={loading || !email}
             onClick={handleMagicLink}
           >
-            {loading ? '⏳ Envoi...' : '✉️ Envoyer le lien magique'}
+            {loading ? t.sending : t.sendBtn}
           </button>
           {message && (
             <div className={`msg ${isError ? 'msg-error' : 'msg-success'}`}>
@@ -82,7 +128,7 @@ export default function Auth() {
           )}
         </div>
         <div style={{ marginTop: 24, fontSize: 11, color: '#374151', textAlign: 'center' }}>
-          Première connexion = création automatique de ton compte
+          {t.firstLogin}
         </div>
       </div>
     </div>
