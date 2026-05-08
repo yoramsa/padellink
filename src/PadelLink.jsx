@@ -889,6 +889,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
                 leagueMatches={leagueMatches} follows={follows} ratings={ratings}
                 rankTab={rankTab} setRankTab={setRankTab}
                 setViewPlayerId={setViewPlayerId} setTab={setTab}
+                me={me}
               />
             )}
             {tab === 'profile' && (
@@ -2157,8 +2158,10 @@ function LeagueChatTab({ t, league, players, me, sendChatMsg }) {
 }
 
 // ══ RANKING ══
-function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings, rankTab, setRankTab, setViewPlayerId, setTab }) {
+function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, setViewPlayerId, setTab, me }) {
   const sorted = [...players].sort((a, b) => b.points - a.points)
+  const followedIds = follows.filter(f => f.follower_id === me.id).map(f => f.following_id)
+  const followedSorted = [...players].filter(p => followedIds.includes(p.id)).sort((a, b) => b.points - a.points)
 
   function formColor(h) {
     if (!h?.length) return '#6b7280'
@@ -2167,37 +2170,43 @@ function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings
     return wr >= 0.6 ? '#10b981' : wr >= 0.4 ? '#f59e0b' : '#ef4444'
   }
 
+  function renderRow(p, idx) {
+    const info = getLevelInfo(p.level)
+    const lbl = lang === 'en' ? info.labelEn : info.label
+    const nc = 'rank-num' + (idx === 0 ? ' top1' : idx === 1 ? ' top2' : idx === 2 ? ' top3' : '')
+    const pRatings = ratings.filter(r => r.rated_id === p.id)
+    const badges = computeBadges(p, pRatings)
+    const wp = p.matches > 0 ? Math.round(p.wins / p.matches * 100) : 0
+    return (
+      <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}>
+        <div className={nc}>{idx + 1}</div>
+        <Av size={34} photo={p.photo_url} name={p.name} />
+        <div className="col flex1">
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}{badges.length ? ' ' + badges.slice(0, 2).join('') : ''}</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <span style={{ fontSize: 10, color: info.color }}>{lbl}</span>
+            <span className="text-xs">{p.city}</span>
+            <span className="text-xs">{wp}%V</span>
+          </div>
+        </div>
+        <span style={{ fontSize: 18, color: formColor(p.win_history) }}>●</span>
+        <div style={{ textAlign: 'right', fontFamily: "'Bebas Neue',cursive", fontSize: 20, color: '#a855f7', minWidth: 50 }}>{p.points}</div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="section-title">{t.ranking}</div>
       <div className="tab-bar">
         <button className={'tab-pill ' + (rankTab === 'world' ? 'active' : '')} onClick={() => setRankTab('world')}>{t.worldRank}</button>
-        <button className={'tab-pill ' + (rankTab === 'league' ? 'active' : '')} onClick={() => setRankTab('league')}>{t.leagueRank}</button>
+        <button className={'tab-pill ' + (rankTab === 'league' ? 'active' : '')} onClick={() => setRankTab('league')}>
+          {lang === 'fr' ? '👥 Suivis' : '👥 Followed'}
+        </button>
       </div>
       {rankTab === 'world' && (
         <div>
-          {sorted.map((p, idx) => {
-            const info = getLevelInfo(p.level)
-            const lbl = lang === 'en' ? info.labelEn : info.label
-            const nc = 'rank-num' + (idx === 0 ? ' top1' : idx === 1 ? ' top2' : idx === 2 ? ' top3' : '')
-            const pRatings = ratings.filter(r => r.rated_id === p.id)
-            const badges = computeBadges(p, pRatings)
-            return (
-              <div key={p.id} className="rank-row" onClick={() => { setViewPlayerId(p.id); setTab('players') }}>
-                <div className={nc}>{idx + 1}</div>
-                <Av size={34} photo={p.photo_url} name={p.name} />
-                <div className="col flex1">
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}{badges.length ? ' ' + badges.slice(0, 2).join('') : ''}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <span style={{ fontSize: 10, color: info.color }}>{lbl}</span>
-                    <span className="text-xs">{p.city}</span>
-                  </div>
-                </div>
-                <span style={{ fontSize: 18, color: formColor(p.win_history) }}>●</span>
-                <div style={{ textAlign: 'right', fontFamily: "'Bebas Neue',cursive", fontSize: 20, color: '#a855f7', minWidth: 50 }}>{p.points}</div>
-              </div>
-            )
-          })}
+          {sorted.map((p, idx) => renderRow(p, idx))}
           <div className="card mt8">
             <div className="fw600 mb8" style={{ fontSize: 12 }}>{lang === 'en' ? 'Point system:' : 'Système de points :'}</div>
             <div className="text-xs" style={{ lineHeight: 2 }}>
@@ -2210,30 +2219,10 @@ function RankingTab({ t, lang, players, leagues, leagueMatches, follows, ratings
       )}
       {rankTab === 'league' && (
         <div>
-          {leagues.map(l => {
-            const tbl = {}
-            ;(l.teams || []).forEach(tm => { tbl[tm.id] = { id: tm.id, name: tm.name, P: 0, W: 0, D: 0, PTS: 0 } })
-            leagueMatches.filter(m => m.league_id === l.id).forEach(m => {
-              if (!tbl[m.team1_id]) tbl[m.team1_id] = { id: m.team1_id, name: '?', P: 0, W: 0, D: 0, PTS: 0 }
-              if (!tbl[m.team2_id]) tbl[m.team2_id] = { id: m.team2_id, name: '?', P: 0, W: 0, D: 0, PTS: 0 }
-              tbl[m.team1_id].P++; tbl[m.team2_id].P++
-              if (m.winner_id === m.team1_id) { tbl[m.team1_id].W++; tbl[m.team1_id].PTS += 3; tbl[m.team2_id].D++ }
-              else { tbl[m.team2_id].W++; tbl[m.team2_id].PTS += 3; tbl[m.team1_id].D++ }
-            })
-            const rows = Object.values(tbl).sort((a, b) => b.PTS - a.PTS)
-            return (
-              <div key={l.id} style={{ marginBottom: 16 }}>
-                <div style={{ padding: '8px 16px', fontSize: 13, fontWeight: 700, color: '#a855f7' }}>{l.is_private ? '🔒 ' : '🌍 '}{l.name}</div>
-                {rows.map((row, idx) => (
-                  <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span style={{ fontSize: 13, color: idx === 0 ? '#a855f7' : '#e2e8f0' }}>{idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : ''}{row.name}</span>
-                    <span style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 18, color: '#a855f7' }}>{row.PTS} PTS</span>
-                  </div>
-                ))}
-                {rows.length === 0 && <div className="empty" style={{ padding: '12px 16px' }}>{t.noMatchYet}</div>}
-              </div>
-            )
-          })}
+          {followedSorted.length === 0
+            ? <div className="empty">{lang === 'fr' ? 'Tu ne suis aucun joueur.' : 'You follow no players.'}</div>
+            : followedSorted.map((p, idx) => renderRow(p, idx))
+          }
         </div>
       )}
     </div>
