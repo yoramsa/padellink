@@ -236,6 +236,9 @@ const T = {
     balanceDesc:'1er avec le 3e, 2e avec le 4e — équipes de niveau similaire.',
     availablePlayers:'Joueurs disponibles',
     completeTeams:'⚡ Générer les équipes restantes automatiquement',
+    leaguesSection:'Ligues',tournamentsSection:'Tournois',
+    noTournaments:'Aucun tournoi pour l\'instant.',selectLeagueForTournament:'Ligue',
+    noLeagueForTournament:'Rejoins une ligue pour créer un tournoi.',
     tournamentTab:'Tournoi',createTournament:'Créer un tournoi',noTournament:'Aucun tournoi dans cette ligue.',
     tournamentName:'Nom du tournoi',tournamentType:'Type de tournoi',elimination:'Élimination directe',
     roundRobin:'Round Robin (tous vs tous)',selectTournamentTeams:'Sélectionner les équipes',
@@ -307,6 +310,9 @@ const T = {
     balanceDesc:'1st with 3rd, 2nd with 4th — teams of similar level.',
     availablePlayers:'Available players',
     completeTeams:'⚡ Auto-generate remaining teams',
+    leaguesSection:'Leagues',tournamentsSection:'Tournaments',
+    noTournaments:'No tournaments yet.',selectLeagueForTournament:'League',
+    noLeagueForTournament:'Join a league to create a tournament.',
     tournamentTab:'Tournament',createTournament:'Create tournament',noTournament:'No tournament in this league.',
     tournamentName:'Tournament name',tournamentType:'Tournament type',elimination:'Single Elimination',
     roundRobin:'Round Robin (all vs all)',selectTournamentTeams:'Select teams',
@@ -378,6 +384,9 @@ const T = {
     balanceDesc:'ראשון עם שלישי, שני עם רביעי — קבוצות ברמה דומה.',
     availablePlayers:'שחקנים זמינים',
     completeTeams:'⚡ הגנרט את הקבוצות הנותרות אוטומטית',
+    leaguesSection:'ליגות',tournamentsSection:'טורנירים',
+    noTournaments:'אין טורנירים עדיין.',selectLeagueForTournament:'ליגה',
+    noLeagueForTournament:'הצטרף לליגה כדי ליצור טורניר.',
     tournamentTab:'טורניר',createTournament:'צור טורניר',noTournament:'אין טורניר בליגה זו.',
     tournamentName:'שם הטורניר',tournamentType:'סוג הטורניר',elimination:'נוקאאוט',
     roundRobin:'ליגה (כולם נגד כולם)',selectTournamentTeams:'בחר קבוצות',
@@ -568,6 +577,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   const [viewLeagueId, setViewLeagueId] = useState(null)
   const [previewLeagueId, setPreviewLeagueId] = useState(null)
   const [selectedLeagueTab, setSelectedLeagueTab] = useState('ranking2')
+  const [leagueSection, setLeagueSection] = useState('leagues')
   const [rankTab, setRankTab] = useState('world')
   const [loadingData, setLoadingData] = useState(true)
   const [loadingBg, setLoadingBg] = useState(true)
@@ -995,10 +1005,31 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
               />
             )}
             {tab === 'leagues' && !viewLeagueId && !previewLeague && (
-              <LeaguesTab t={t} lang={lang} me={me} leagues={leagues} players={players}
-                createLeague={createLeague} joinLeague={joinLeague}
-                setViewLeagueId={setViewLeagueId} setPreviewLeagueId={setPreviewLeagueId}
-              />
+              <>
+                <div style={{ display: 'flex', margin: '12px 16px 0', background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 4, gap: 4 }}>
+                  {['leagues', 'tournaments'].map(sec => (
+                    <button key={sec} onClick={() => setLeagueSection(sec)} style={{
+                      flex: 1, padding: '8px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+                      fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 13, fontWeight: 700,
+                      background: leagueSection === sec ? 'linear-gradient(135deg,#7c3aed,#06b6d4)' : 'transparent',
+                      color: leagueSection === sec ? '#fff' : '#6b7280', transition: 'all 0.2s'
+                    }}>
+                      {sec === 'leagues' ? '🏆 ' + t.leaguesSection : '🎯 ' + t.tournamentsSection}
+                    </button>
+                  ))}
+                </div>
+                {leagueSection === 'leagues' && (
+                  <LeaguesTab t={t} lang={lang} me={me} leagues={leagues} players={players}
+                    createLeague={createLeague} joinLeague={joinLeague}
+                    setViewLeagueId={setViewLeagueId} setPreviewLeagueId={setPreviewLeagueId}
+                  />
+                )}
+                {leagueSection === 'tournaments' && (
+                  <TournamentListTab t={t} lang={lang} me={me} leagues={leagues} players={players}
+                    tournaments={tournaments} loadTournaments={loadTournaments}
+                  />
+                )}
+              </>
             )}
             {tab === 'leagues' && previewLeague && !viewLeagueId && (
               <LeaguePreview t={t} lang={lang} league={previewLeague} players={players} me={me}
@@ -1016,7 +1047,6 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
                 randomDrawTeams={randomDrawTeams} leaveRequests={leaveRequests}
                 onBack={() => { setViewLeagueId(null); setSelectedLeagueTab('ranking2') }}
                 loadLeagues={loadLeagues} deleteLeague={deleteLeague}
-                tournaments={tournaments} loadTournaments={loadTournaments}
               />
             )}
             {tab === 'ranking' && (
@@ -1847,7 +1877,7 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
 }
 
 // ══ LEAGUE VIEW ══
-function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, setSelectedTab, addLeagueMatch, expelMember, sendChatMsg, toggleSubAdmin, requestLeave, resolveLeave, randomDrawTeams, leaveRequests, onBack, loadLeagues, deleteLeague, tournaments, loadTournaments }) {
+function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, setSelectedTab, addLeagueMatch, expelMember, sendChatMsg, toggleSubAdmin, requestLeave, resolveLeave, randomDrawTeams, leaveRequests, onBack, loadLeagues, deleteLeague }) {
   const isAdmin = league.admin_id === me.id
   const myRole = league.league_members?.find(lm => lm.player_id === me.id)?.role
   const isSubAdmin = myRole === 'sub_admin'
@@ -1874,7 +1904,6 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
     { id: 'ranking2', label: t.ranking2 },
     { id: 'matches', label: t.matches },
     { id: 'teams', label: t.teams },
-    { id: 'tournament', label: '🏆 ' + t.tournamentTab },
     { id: 'members', label: t.members },
     { id: 'chat', label: t.chat },
   ]
@@ -1946,7 +1975,6 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
       {selectedTab === 'ranking2' && <LeagueStandings t={t} standings={computeStandings()} />}
       {selectedTab === 'matches' && <LeagueMatchesTab t={t} lang={lang} league={league} players={players} leagueMatches={leagueMatches} addLeagueMatch={addLeagueMatch} canPostScore={canPostScore} meetsAntiCheat={meetsAntiCheat} memberCount={memberCount} teamCount={teamCount} />}
       {selectedTab === 'teams' && <LeagueTeamsTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} isSubAdmin={isSubAdmin} randomDrawTeams={randomDrawTeams} loadLeagues={loadLeagues} />}
-      {selectedTab === 'tournament' && <TournamentTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} isSubAdmin={isSubAdmin} tournaments={tournaments} loadTournaments={loadTournaments} />}
       {selectedTab === 'members' && <LeagueMembersTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} expelMember={expelMember} toggleSubAdmin={toggleSubAdmin} me={me} />}
       {selectedTab === 'chat' && <LeagueChatTab t={t} league={league} players={players} me={me} sendChatMsg={sendChatMsg} />}
     </div>
@@ -2414,6 +2442,206 @@ function computeRRStandings(bracket) {
   return Object.values(stats).sort((a, b) => b.P - a.P || b.W - a.W)
 }
 
+// ── Standalone Tournaments section (top-level, not inside a league) ──
+function TournamentListTab({ t, lang, me, leagues, players, tournaments, loadTournaments }) {
+  const [creating, setCreating] = useState(false)
+  const [viewId, setViewId] = useState(null)
+  const showToast = useToast()
+  const confirm = useConfirm()
+
+  const myLeagueIds = leagues.filter(l => {
+    const myRole = (l.league_members || []).find(m => m.player_id === me.id)?.role
+    return l.admin_id === me.id || myRole === 'sub_admin' || myRole === 'member'
+  }).map(l => l.id)
+
+  const myAdminLeagueIds = leagues.filter(l => {
+    const myRole = (l.league_members || []).find(m => m.player_id === me.id)?.role
+    return l.admin_id === me.id || myRole === 'sub_admin'
+  }).map(l => l.id)
+
+  const allTournaments = (tournaments || []).filter(tr => myLeagueIds.includes(tr.league_id))
+
+  const viewing = viewId ? allTournaments.find(tr => tr.id === viewId) : null
+  const viewingLeague = viewing ? leagues.find(l => l.id === viewing.league_id) : null
+
+  async function handleDelete(trId, leagueId) {
+    const ok = await confirm(t.confirmDeleteTournament)
+    if (!ok) return
+    await supabase.from('tournaments').delete().eq('id', trId)
+    await loadTournaments(myLeagueIds)
+    setViewId(null)
+    showToast(lang === 'fr' ? 'Tournoi supprimé' : lang === 'he' ? 'טורניר נמחק' : 'Tournament deleted', 'ok')
+  }
+
+  function reloadAll() { if (myLeagueIds.length) loadTournaments(myLeagueIds) }
+
+  if (viewing && viewingLeague) {
+    const isAdmin = viewingLeague.admin_id === me.id
+    const myRole = (viewingLeague.league_members || []).find(m => m.player_id === me.id)?.role
+    const isSubAdmin = myRole === 'sub_admin'
+    return (
+      <TournamentView t={t} lang={lang} tournament={viewing} league={viewingLeague} players={players}
+        isAdmin={isAdmin} isSubAdmin={isSubAdmin} loadTournaments={reloadAll}
+        onBack={() => setViewId(null)} onDelete={() => handleDelete(viewing.id, viewing.league_id)} />
+    )
+  }
+
+  return (
+    <div style={{ padding: '8px 16px 0' }}>
+      {myAdminLeagueIds.length > 0 ? (
+        <button className="btn btn-primary mt4" style={{ width: '100%' }} onClick={() => setCreating(true)}>
+          🎯 {t.createTournament}
+        </button>
+      ) : (
+        <div style={{ margin: '12px 0', padding: '14px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 14, fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>
+          {t.noLeagueForTournament}
+        </div>
+      )}
+      {allTournaments.length === 0 && <div className="empty mt8">{t.noTournaments}</div>}
+      {allTournaments.map(tr => {
+        const league = leagues.find(l => l.id === tr.league_id)
+        const bracket = tr.bracket || {}
+        const isFinished = bracket.status === 'finished'
+        const winnerTeam = bracket.winner ? (league?.teams || []).find(tm => tm.id === bracket.winner) : null
+        const typeLabel = bracket.type === 'elimination'
+          ? (lang === 'fr' ? '🎯 Élimination' : lang === 'he' ? '🎯 נוקאאוט' : '🎯 Elimination')
+          : (lang === 'fr' ? '🔄 Round Robin' : lang === 'he' ? '🔄 ליגה' : '🔄 Round Robin')
+        return (
+          <div key={tr.id} className="card mt8" onClick={() => setViewId(tr.id)} style={{ cursor: 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{tr.name}</div>
+                {league && <div style={{ fontSize: 11, color: '#a855f7', fontWeight: 600, marginBottom: 4 }}>🏆 {league.name}</div>}
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{typeLabel} · {(bracket.teams || []).length} {t.teams.toLowerCase()}</div>
+                {isFinished && winnerTeam && (
+                  <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, marginTop: 6 }}>🥇 {winnerTeam.name}</div>
+                )}
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, flexShrink: 0,
+                background: isFinished ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                color: isFinished ? '#10b981' : '#f59e0b',
+                border: `1px solid ${isFinished ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
+                {isFinished ? (lang === 'fr' ? '✓ Terminé' : lang === 'he' ? '✓ הסתיים' : '✓ Done') : (lang === 'fr' ? '▶ En cours' : lang === 'he' ? '▶ פעיל' : '▶ Active')}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+      {creating && (
+        <CreateStandaloneTournamentModal t={t} lang={lang} me={me}
+          leagues={leagues.filter(l => myAdminLeagueIds.includes(l.id))}
+          players={players}
+          onClose={() => setCreating(false)}
+          loadTournaments={reloadAll}
+        />
+      )}
+    </div>
+  )
+}
+
+function CreateStandaloneTournamentModal({ t, lang, me, leagues, players, onClose, loadTournaments }) {
+  const [selectedLeagueId, setSelectedLeagueId] = useState(leagues[0]?.id || '')
+  const [name, setName] = useState('')
+  const [type, setType] = useState('elimination')
+  const [selectedTeams, setSelectedTeams] = useState([])
+  const [hasThirdPlace, setHasThirdPlace] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState(null)
+  const showToast = useToast()
+
+  const league = leagues.find(l => l.id === selectedLeagueId)
+  const allTeams = league?.teams || []
+
+  function toggleTeam(teamId) {
+    setSelectedTeams(prev => prev.includes(teamId) ? prev.filter(x => x !== teamId) : [...prev, teamId])
+  }
+
+  function handleLeagueChange(id) {
+    setSelectedLeagueId(id)
+    setSelectedTeams([])
+  }
+
+  async function handleCreate() {
+    if (!name.trim()) { setErr(lang === 'fr' ? 'Entrez un nom.' : lang === 'he' ? 'הכנס שם.' : 'Enter a name.'); return }
+    if (!selectedLeagueId) { setErr(lang === 'fr' ? 'Sélectionnez une ligue.' : lang === 'he' ? 'בחר ליגה.' : 'Select a league.'); return }
+    if (selectedTeams.length < 2) { setErr(lang === 'fr' ? 'Sélectionnez au moins 2 équipes.' : lang === 'he' ? 'בחר לפחות 2 קבוצות.' : 'Select at least 2 teams.'); return }
+    setSaving(true); setErr(null)
+    const bracket = type === 'elimination' ? generateElimBracket(selectedTeams, hasThirdPlace) : generateRRBracket(selectedTeams)
+    const { error } = await supabase.from('tournaments').insert({ league_id: selectedLeagueId, name: name.trim(), type, bracket })
+    setSaving(false)
+    if (error) { setErr(error.message); return }
+    loadTournaments()
+    showToast(lang === 'fr' ? '🏆 Tournoi créé !' : lang === 'he' ? '🏆 טורניר נוצר!' : '🏆 Tournament created!', 'ok')
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">🎯 {t.createTournament}</div>
+
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.selectLeagueForTournament}</div>
+        <select className="select mb12" value={selectedLeagueId} onChange={e => handleLeagueChange(e.target.value)}>
+          {leagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.tournamentName}</div>
+        <input className="input mb12" value={name} onChange={e => setName(e.target.value)}
+          placeholder={lang === 'fr' ? 'Coupe de Tel Aviv' : lang === 'he' ? 'גביע תל אביב' : 'Tel Aviv Cup'} maxLength={60} />
+
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.tournamentType}</div>
+        <div className="row gap8 mb12">
+          {['elimination', 'roundrobin'].map(tp => (
+            <button key={tp} onClick={() => setType(tp)} style={{ flex: 1, padding: '10px 8px', borderRadius: 12, border: `1px solid ${type === tp ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, background: type === tp ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: type === tp ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
+              {tp === 'elimination' ? '🎯 ' + t.elimination : '🔄 ' + t.roundRobin}
+            </button>
+          ))}
+        </div>
+
+        {type === 'elimination' && (
+          <div className="row mb12" style={{ cursor: 'pointer' }} onClick={() => setHasThirdPlace(!hasThirdPlace)}>
+            <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${hasThirdPlace ? '#a855f7' : '#4b5563'}`, background: hasThirdPlace ? '#a855f7' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {hasThirdPlace && <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>✓</span>}
+            </div>
+            <span style={{ fontSize: 13, color: '#e2e8f0', marginLeft: 8 }}>🥉 {t.thirdPlace}</span>
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+          {t.selectTournamentTeams} ({selectedTeams.length}/{allTeams.length})
+        </div>
+        {allTeams.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', padding: '12px 0', marginBottom: 12 }}>
+            {lang === 'fr' ? 'Créez d\'abord des équipes dans la ligue.' : lang === 'he' ? 'צור תחילה קבוצות בליגה.' : 'Create teams first in the league.'}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {allTeams.map(tm => {
+              const p1 = players.find(p => p.id === tm.player1_id)
+              const p2 = players.find(p => p.id === tm.player2_id)
+              const selected = selectedTeams.includes(tm.id)
+              return (
+                <button key={tm.id} onClick={() => toggleTeam(tm.id)} style={{ padding: '7px 14px', borderRadius: 20, border: `1px solid ${selected ? '#a855f7' : 'rgba(255,255,255,0.15)'}`, background: selected ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)', color: selected ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {selected && '✓ '}{tm.name}
+                  {p1 && p2 && <span style={{ fontSize: 10, opacity: 0.6 }}> ({((p1.level + p2.level) / 2).toFixed(1)})</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {err && <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 10, textAlign: 'center' }}>{err}</div>}
+        <div className="row gap8">
+          <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
+          <button className="btn btn-primary flex1" disabled={saving || !name.trim() || selectedTeams.length < 2} onClick={handleCreate}>
+            {saving ? <Spin /> : t.startTournament}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TournamentTab({ t, lang, league, players, isAdmin, isSubAdmin, tournaments, loadTournaments }) {
   const [creating, setCreating] = useState(false)
   const [viewId, setViewId] = useState(null)
@@ -2580,7 +2808,7 @@ function TournamentView({ t, lang, tournament, league, players, isAdmin, isSubAd
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 4px' }}>
-        <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.tournamentTab}</button>
+        <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.tournamentsSection}</button>
         {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
       </div>
       <div style={{ padding: '6px 16px 14px' }}>
