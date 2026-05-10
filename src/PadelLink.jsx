@@ -248,12 +248,20 @@ const T = {
     tournamentFinished:'Tournoi terminé',deleteTournament:'Supprimer le tournoi',
     confirmDeleteTournament:'Supprimer ce tournoi définitivement ?',standingsRR:'Classement',
     joinTournament:'Rejoindre',leaveTournament:'Quitter',launchTournament:'🚀 Lancer le tournoi',
-    lobbyStatus:'En attente',teamsRegistered:'équipes inscrites',minTeamsToLaunch:'Minimum 4 équipes pour lancer.',
-    pickPartner:'Choisir un partenaire',teamNameLabel:'Nom de l\'équipe',alreadyJoined:'Tu es déjà inscrit.',
-    joinWithCode:'Entrer le code',maxTeamsLabel:'Équipes max.',myTournaments:'Mes tournois',
-    publicTournaments:'Tournois publics',noPublicTournaments:'Aucun tournoi public pour l\'instant.',
+    lobbyStatus:'En attente',teamsRegistered:'équipes',minTeamsToLaunch:'Minimum 4 équipes pour lancer.',
+    membersRegistered:'joueurs inscrits',
+    alreadyJoined:'Tu es déjà inscrit.',joinWithCode:'Entrer le code',
+    maxTeamsLabel:'Équipes max.',maxTeamsError:'Minimum 4 équipes.',
+    myTournaments:'Mes tournois',publicTournaments:'Tournois publics',
+    noPublicTournaments:'Aucun tournoi public pour l\'instant.',
     tournamentCreated:'🎯 Tournoi créé !',tournamentLaunched:'🚀 Tournoi lancé !',
-    tournamentJoined:'✓ Équipe inscrite !',tournamentLeft:'Équipe retirée.',
+    tournamentJoined:'✓ Inscrit !',tournamentLeft:'Inscription annulée.',
+    privateTournamentLabel:'Rendre le tournoi privé',
+    availableMembers:'Joueurs disponibles',noMembersYet:'Aucun joueur inscrit.',
+    createTeamsFrom:'Créer les équipes',randomDrawT:'Tirage aléatoire',balancedDrawT:'Équilibrer',
+    confirmDrawT:'Tirage aléatoire ? Les équipes existantes seront supprimées.',
+    confirmBalanceT:'Équilibrer ? Les équipes existantes seront supprimées.',
+    notEnoughForTeams:'Pas assez de joueurs (min 4).',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -329,12 +337,20 @@ const T = {
     tournamentFinished:'Tournament finished',deleteTournament:'Delete tournament',
     confirmDeleteTournament:'Permanently delete this tournament?',standingsRR:'Standings',
     joinTournament:'Join',leaveTournament:'Leave',launchTournament:'🚀 Launch tournament',
-    lobbyStatus:'Waiting',teamsRegistered:'teams registered',minTeamsToLaunch:'Minimum 4 teams to launch.',
-    pickPartner:'Pick partner',teamNameLabel:'Team name',alreadyJoined:'You are already registered.',
-    joinWithCode:'Enter code',maxTeamsLabel:'Max teams',myTournaments:'My tournaments',
-    publicTournaments:'Public tournaments',noPublicTournaments:'No public tournaments yet.',
+    lobbyStatus:'Waiting',teamsRegistered:'teams',minTeamsToLaunch:'Minimum 4 teams to launch.',
+    membersRegistered:'players registered',
+    alreadyJoined:'You are already registered.',joinWithCode:'Enter code',
+    maxTeamsLabel:'Max teams',maxTeamsError:'Minimum 4 teams.',
+    myTournaments:'My tournaments',publicTournaments:'Public tournaments',
+    noPublicTournaments:'No public tournaments yet.',
     tournamentCreated:'🎯 Tournament created!',tournamentLaunched:'🚀 Tournament launched!',
-    tournamentJoined:'✓ Team registered!',tournamentLeft:'Team removed.',
+    tournamentJoined:'✓ Registered!',tournamentLeft:'Registration cancelled.',
+    privateTournamentLabel:'Make tournament private',
+    availableMembers:'Available players',noMembersYet:'No players registered yet.',
+    createTeamsFrom:'Create teams',randomDrawT:'Random draw',balancedDrawT:'Balanced',
+    confirmDrawT:'Random draw? Existing teams will be deleted.',
+    confirmBalanceT:'Balance teams? Existing teams will be deleted.',
+    notEnoughForTeams:'Not enough players (min 4).',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
@@ -410,12 +426,20 @@ const T = {
     tournamentFinished:'הטורניר הסתיים',deleteTournament:'מחק טורניר',
     confirmDeleteTournament:'למחוק טורניר זה לצמיתות?',standingsRR:'טבלת דירוג',
     joinTournament:'הצטרף',leaveTournament:'עזוב',launchTournament:'🚀 הפעל טורניר',
-    lobbyStatus:'ממתין',teamsRegistered:'קבוצות רשומות',minTeamsToLaunch:'מינימום 4 קבוצות להפעלה.',
-    pickPartner:'בחר שותף',teamNameLabel:'שם הקבוצה',alreadyJoined:'אתה כבר רשום.',
-    joinWithCode:'הכנס קוד',maxTeamsLabel:'קבוצות מקס',myTournaments:'הטורנירים שלי',
-    publicTournaments:'טורנירים ציבוריים',noPublicTournaments:'אין טורנירים ציבוריים עדיין.',
+    lobbyStatus:'ממתין',teamsRegistered:'קבוצות',minTeamsToLaunch:'מינימום 4 קבוצות להפעלה.',
+    membersRegistered:'שחקנים רשומים',
+    alreadyJoined:'אתה כבר רשום.',joinWithCode:'הכנס קוד',
+    maxTeamsLabel:'קבוצות מקס',maxTeamsError:'מינימום 4 קבוצות.',
+    myTournaments:'הטורנירים שלי',publicTournaments:'טורנירים ציבוריים',
+    noPublicTournaments:'אין טורנירים ציבוריים עדיין.',
     tournamentCreated:'🎯 טורניר נוצר!',tournamentLaunched:'🚀 טורניר הופעל!',
-    tournamentJoined:'✓ קבוצה נרשמה!',tournamentLeft:'קבוצה הוסרה.',
+    tournamentJoined:'✓ נרשמת!',tournamentLeft:'ההרשמה בוטלה.',
+    privateTournamentLabel:'הפוך את הטורניר לפרטי',
+    availableMembers:'שחקנים זמינים',noMembersYet:'אין שחקנים רשומים עדיין.',
+    createTeamsFrom:'צור קבוצות',randomDrawT:'הגרלה אקראית',balancedDrawT:'איזון',
+    confirmDrawT:'הגרלה אקראית? הקבוצות הקיימות יימחקו.',
+    confirmBalanceT:'לאזן קבוצות? הקבוצות הקיימות יימחקו.',
+    notEnoughForTeams:'לא מספיק שחקנים (מינ. 4).',
   }
 }
 
@@ -2482,6 +2506,9 @@ function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments 
   const allTr = tournaments || []
 
   function isMember(tr) {
+    const mbs = tr.bracket?.members || []
+    if (mbs.length) return mbs.includes(me.id)
+    // fallback: check old teams format
     const teams = tr.bracket?.teams || []
     return teams.some(tm => typeof tm === 'object' && (tm.player1_id === me.id || tm.player2_id === me.id))
   }
@@ -2522,6 +2549,7 @@ function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments 
     const bracket = tr.bracket || {}
     const isFinished = bracket.status === 'finished'
     const isLobby = bracket.status === 'lobby'
+    const memberCount = (bracket.members || []).length
     const teamCount = (bracket.teams || []).length
     const winnerTeam = bracket.winner ? (bracket.teams || []).find(tm => tm.id === bracket.winner) : null
     const typeLabel = bracket.type === 'elimination'
@@ -2558,7 +2586,7 @@ function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments 
               {isPrivate && <span style={{ fontSize: 10 }}>🔒</span>}
               <div style={{ fontSize: 15, fontWeight: 700 }}>{tr.name}</div>
             </div>
-            <div style={{ fontSize: 11, color: '#9ca3af' }}>{typeLabel} · {teamCount} {t.teamsRegistered}</div>
+            <div style={{ fontSize: 11, color: '#9ca3af' }}>{typeLabel} · {isLobby ? memberCount + ' ' + t.membersRegistered : teamCount + ' ' + t.teamsRegistered}</div>
             {isFinished && winnerTeam && (
               <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, marginTop: 4 }}>🥇 {winnerTeam.name}</div>
             )}
@@ -2618,7 +2646,7 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
   const [hasThirdPlace, setHasThirdPlace] = useState(true)
   const [isPrivate, setIsPrivate] = useState(false)
   const [code, setCode] = useState('')
-  const [maxTeams, setMaxTeams] = useState('8')
+  const [maxTeams, setMaxTeams] = useState('')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
   const showToast = useToast()
@@ -2626,6 +2654,7 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
   async function handleCreate() {
     if (!name.trim() || name.trim().length < 2) { setErr(t.nameRequired); return }
     const max = parseInt(maxTeams) || 0
+    if (max > 0 && max < 4) { setErr(t.maxTeamsError); return }
     setSaving(true); setErr(null)
     const bracket = {
       creator_id: me.id,
@@ -2635,6 +2664,7 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
       is_private: isPrivate,
       access_code: isPrivate ? code.trim().toUpperCase() : '',
       max_teams: max,
+      members: [],
       teams: [],
       rounds: [],
       matches: [],
@@ -2681,13 +2711,13 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
         )}
 
         <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.maxTeamsLabel}</div>
-        <input className="input mb12" type="number" min="4" max="32" value={maxTeams}
+        <input className="input mb12" type="number" min="4" max="64" value={maxTeams}
           onChange={e => setMaxTeams(e.target.value)}
-          placeholder="8" />
+          placeholder={lang === 'fr' ? '8 (0 = illimité)' : lang === 'he' ? '8 (0 = ללא הגבלה)' : '8 (0 = unlimited)'} />
 
         <div className="row mb12" style={{ cursor: 'pointer' }} onClick={() => setIsPrivate(!isPrivate)}>
           <div className={'toggle-track ' + (isPrivate ? 'on' : '')}><div className="toggle-thumb" /></div>
-          <span style={{ fontSize: 13, color: '#e2e8f0', marginLeft: 10 }}>{t.privateToggleLabel}</span>
+          <span style={{ fontSize: 13, color: '#e2e8f0', marginLeft: 10 }}>{t.privateTournamentLabel}</span>
         </div>
 
         {isPrivate && (
@@ -2712,24 +2742,95 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
 
 function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, onBack, onDelete }) {
   const bracket = tournament.bracket || {}
+  const members = bracket.members || []
   const teams = bracket.teams || []
-  const [joining, setJoining] = useState(false)
+  const [lobbyTab, setLobbyTab] = useState('members')
   const [launching, setLaunching] = useState(false)
+  const [addingTeam, setAddingTeam] = useState(false)
   const showToast = useToast()
   const confirm = useConfirm()
 
-  const myTeam = teams.find(tm => tm.player1_id === me.id || tm.player2_id === me.id)
+  const isMember = members.includes(me.id)
   const maxTeams = bracket.max_teams || 0
-  const isFull = maxTeams > 0 && teams.length >= maxTeams
+  const maxPlayers = maxTeams * 2
+  const isFull = maxPlayers > 0 && members.length >= maxPlayers
   const canLaunch = teams.length >= 4
+
+  // Players not yet assigned to any team
+  const assignedIds = teams.flatMap(tm => [tm.player1_id, tm.player2_id])
+  const unassigned = members.filter(id => !assignedIds.includes(id))
+
+  async function handleJoin() {
+    if (isMember) return
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.members = [...(nb.members || []), me.id]
+    const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    if (error) { showToast(t.errorGeneric, 'err'); return }
+    reload(); showToast(t.tournamentJoined, 'ok')
+  }
 
   async function handleLeave() {
     const nb = JSON.parse(JSON.stringify(bracket))
-    nb.teams = nb.teams.filter(tm => tm.player1_id !== me.id && tm.player2_id !== me.id)
+    nb.members = (nb.members || []).filter(id => id !== me.id)
+    nb.teams = (nb.teams || []).filter(tm => tm.player1_id !== me.id && tm.player2_id !== me.id)
     const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
     if (error) { showToast(t.errorGeneric, 'err'); return }
+    reload(); showToast(t.tournamentLeft, 'info')
+  }
+
+  async function handleRemoveMember(pid) {
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.members = (nb.members || []).filter(id => id !== pid)
+    nb.teams = (nb.teams || []).filter(tm => tm.player1_id !== pid && tm.player2_id !== pid)
+    await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
     reload()
-    showToast(t.tournamentLeft, 'info')
+  }
+
+  async function handleRemoveTeam(teamId) {
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.teams = nb.teams.filter(x => x.id !== teamId)
+    await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    reload()
+  }
+
+  async function handleRandomDraw() {
+    if (members.length < 4) { showToast(t.notEnoughForTeams, 'err'); return }
+    const ok = await confirm(t.confirmDrawT)
+    if (!ok) return
+    const shuffled = [...members].sort(() => Math.random() - 0.5)
+    const newTeams = []
+    for (let i = 0; i + 1 < shuffled.length; i += 2) {
+      const p1 = players.find(p => p.id === shuffled[i])
+      const p2 = players.find(p => p.id === shuffled[i + 1])
+      newTeams.push({ id: crypto.randomUUID(), name: (p1?.name.split(' ')[0] || '?') + ' & ' + (p2?.name.split(' ')[0] || '?'), player1_id: shuffled[i], player2_id: shuffled[i + 1] })
+    }
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.teams = newTeams
+    await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    reload(); showToast(t.saved, 'ok')
+  }
+
+  async function handleBalancedDraw() {
+    if (members.length < 4) { showToast(t.notEnoughForTeams, 'err'); return }
+    const ok = await confirm(t.confirmBalanceT)
+    if (!ok) return
+    const sorted = [...members].sort((a, b) => {
+      const lvA = players.find(p => p.id === a)?.level || 0
+      const lvB = players.find(p => p.id === b)?.level || 0
+      return lvB - lvA
+    })
+    const newTeams = []
+    const half = Math.floor(sorted.length / 2)
+    for (let i = 0; i < half; i++) {
+      const p1 = players.find(p => p.id === sorted[i])
+      const p2 = players.find(p => p.id === sorted[sorted.length - 1 - i])
+      if (!p2) break
+      newTeams.push({ id: crypto.randomUUID(), name: (p1?.name.split(' ')[0] || '?') + ' & ' + (p2?.name.split(' ')[0] || '?'), player1_id: sorted[i], player2_id: sorted[sorted.length - 1 - i] })
+    }
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.teams = newTeams
+    await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    reload(); showToast(t.saved, 'ok')
   }
 
   async function handleLaunch() {
@@ -2740,22 +2841,16 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
     const newData = bracket.type === 'elimination'
       ? generateElimBracket(teamIds, bracket.has_third_place)
       : generateRRBracket(teamIds)
-    const nb = {
-      ...newData,
-      teams: teams,
-      creator_id: bracket.creator_id,
-      is_private: bracket.is_private,
-      access_code: bracket.access_code,
-      max_teams: bracket.max_teams,
-      has_third_place: bracket.has_third_place,
-    }
+    const nb = { ...newData, teams, members, creator_id: bracket.creator_id, is_private: bracket.is_private, access_code: bracket.access_code, max_teams: bracket.max_teams, has_third_place: bracket.has_third_place }
     const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
     setLaunching(false)
     if (error) { showToast(t.errorGeneric, 'err'); return }
-    reload()
-    showToast(t.tournamentLaunched, 'ok')
-    onBack()
+    reload(); showToast(t.tournamentLaunched, 'ok'); onBack()
   }
+
+  const typeLabel = bracket.type === 'elimination'
+    ? (lang === 'fr' ? '🎯 Élimination directe' : lang === 'he' ? '🎯 נוקאאוט' : '🎯 Single Elimination')
+    : (lang === 'fr' ? '🔄 Round Robin' : lang === 'he' ? '🔄 ליגה' : '🔄 Round Robin')
 
   return (
     <div>
@@ -2763,148 +2858,199 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
         <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.tournamentsSection}</button>
         {isAdmin && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
       </div>
-      <div style={{ padding: '6px 16px 10px' }}>
+      <div style={{ padding: '4px 16px 10px' }}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>{tournament.name}</div>
-        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
-          {bracket.type === 'elimination'
-            ? (lang === 'fr' ? '🎯 Élimination directe' : lang === 'he' ? '🎯 נוקאאוט' : '🎯 Single Elimination')
-            : (lang === 'fr' ? '🔄 Round Robin' : lang === 'he' ? '🔄 ליגה' : '🔄 Round Robin')}
-          {bracket.is_private && ' · 🔒'}
+        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{typeLabel}{bracket.is_private && ' · 🔒'}</div>
+      </div>
+
+      {/* Stats bar */}
+      <div style={{ margin: '0 16px 12px', display: 'flex', gap: 10 }}>
+        <div style={{ flex: 1, padding: '10px 12px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 12, textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 28, color: '#a855f7', lineHeight: 1 }}>{members.length}{maxPlayers > 0 ? '/' + maxPlayers : ''}</div>
+          <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.membersRegistered}</div>
+        </div>
+        <div style={{ flex: 1, padding: '10px 12px', background: canLaunch ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.04)', border: `1px solid ${canLaunch ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 12, textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 28, color: canLaunch ? '#10b981' : '#6b7280', lineHeight: 1 }}>{teams.length}</div>
+          <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.teamsRegistered}</div>
         </div>
       </div>
 
-      <div style={{ margin: '0 16px 12px', padding: '12px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 32, color: '#a855f7', lineHeight: 1 }}>{teams.length}{maxTeams > 0 ? '/' + maxTeams : ''}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{t.teamsRegistered}</div>
-          </div>
-          {!canLaunch && <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600, textAlign: 'right' }}>{t.minTeamsToLaunch}</div>}
-          {canLaunch && isAdmin && (
-            <button className="btn btn-primary" disabled={launching} onClick={handleLaunch}>
-              {launching ? <Spin /> : t.launchTournament}
+      {!canLaunch && <div style={{ margin: '0 16px 10px', fontSize: 11, color: '#ef4444', fontWeight: 600 }}>{t.minTeamsToLaunch}</div>}
+
+      {/* Join / leave for player */}
+      {!isMember && !isFull && (
+        <div style={{ margin: '0 16px 12px' }}>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleJoin}>+ {t.joinTournament}</button>
+        </div>
+      )}
+      {isMember && (
+        <div style={{ margin: '0 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600 }}>✓ {t.alreadyJoined}</span>
+          <button className="btn btn-danger btn-sm" onClick={handleLeave}>{t.leaveTournament}</button>
+        </div>
+      )}
+      {isFull && !isMember && (
+        <div style={{ margin: '0 16px 12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
+          {lang === 'fr' ? 'Tournoi complet.' : lang === 'he' ? 'הטורניר מלא.' : 'Tournament full.'}
+        </div>
+      )}
+
+      {/* Admin: launch */}
+      {isAdmin && canLaunch && (
+        <div style={{ margin: '0 16px 12px' }}>
+          <button className="btn btn-primary" style={{ width: '100%', background: 'linear-gradient(135deg,#059669,#10b981)' }} disabled={launching} onClick={handleLaunch}>
+            {launching ? <Spin /> : t.launchTournament}
+          </button>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="tab-bar" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
+        {[{id:'members',label:t.members},{id:'teams',label:t.teams}].map(tb => (
+          <button key={tb.id} className={'tab-pill ' + (lobbyTab === tb.id ? 'active' : '')} onClick={() => setLobbyTab(tb.id)}>{tb.label}</button>
+        ))}
+      </div>
+
+      {/* MEMBERS TAB */}
+      {lobbyTab === 'members' && (
+        <div style={{ padding: '4px 16px' }}>
+          {members.length === 0 && <div className="empty">{t.noMembersYet}</div>}
+          {members.map(pid => {
+            const p = players.find(x => x.id === pid)
+            const inTeam = assignedIds.includes(pid)
+            return (
+              <div key={pid} className="row" style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
+                  {p?.name?.[0]?.toUpperCase() || '?'}
+                </div>
+                <div className="flex1">
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{p?.name || '?'}</div>
+                  <div style={{ fontSize: 11, color: inTeam ? '#10b981' : '#6b7280' }}>{inTeam ? (lang === 'fr' ? '✓ En équipe' : lang === 'he' ? '✓ בקבוצה' : '✓ In team') : (lang === 'fr' ? 'Sans équipe' : lang === 'he' ? 'ללא קבוצה' : 'No team')}</div>
+                </div>
+                <span style={{ fontSize: 11, color: '#9ca3af' }}>{p?.level || ''}</span>
+                {isAdmin && <button className="btn btn-danger btn-sm" style={{ marginLeft: 8 }} onClick={() => handleRemoveMember(pid)}>✕</button>}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* TEAMS TAB */}
+      {lobbyTab === 'teams' && (
+        <div style={{ padding: '4px 16px' }}>
+          {/* Admin draw buttons */}
+          {isAdmin && members.length >= 4 && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button className="btn btn-yellow btn-sm flex1" onClick={handleRandomDraw}>🎲 {t.randomDrawT}</button>
+              <button className="btn btn-green btn-sm flex1" onClick={handleBalancedDraw}>⚖️ {t.balancedDrawT}</button>
+            </div>
+          )}
+          {/* Admin: add team manually */}
+          {isAdmin && unassigned.length >= 2 && (
+            <button className="btn btn-outline btn-sm" style={{ width: '100%', marginBottom: 10 }} onClick={() => setAddingTeam(true)}>
+              + {lang === 'fr' ? 'Créer une équipe manuellement' : lang === 'he' ? 'צור קבוצה ידנית' : 'Create team manually'}
             </button>
           )}
-        </div>
-      </div>
-
-      <div style={{ padding: '0 16px' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.teams}</div>
-        {teams.length === 0 && <div className="empty" style={{ padding: '16px 0' }}>{t.noMatchYet}</div>}
-        {teams.map(tm => {
-          const p1 = players.find(p => p.id === tm.player1_id)
-          const p2 = players.find(p => p.id === tm.player2_id)
-          const isMe = tm.player1_id === me.id || tm.player2_id === me.id
-          return (
-            <div key={tm.id} className="card" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{tm.name}</div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>{p1?.name || '?'} & {p2?.name || '?'}</div>
+          {teams.length === 0 && <div className="empty">{lang === 'fr' ? 'Aucune équipe créée.' : lang === 'he' ? 'אין קבוצות עדיין.' : 'No teams yet.'}</div>}
+          {teams.map(tm => {
+            const p1 = players.find(p => p.id === tm.player1_id)
+            const p2 = players.find(p => p.id === tm.player2_id)
+            const lvg = p1 && p2 ? ((p1.level + p2.level) / 2).toFixed(1) : null
+            return (
+              <div key={tm.id} className="card" style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{tm.name}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>{p1?.name || '?'} & {p2?.name || '?'}{lvg ? ' · ' + lvg : ''}</div>
+                  </div>
+                  {isAdmin && <button className="btn btn-danger btn-sm" onClick={() => handleRemoveTeam(tm.id)}>🗑</button>}
+                </div>
               </div>
-              {isMe && (
-                <button className="btn btn-danger btn-sm" onClick={handleLeave}>{t.leaveTournament}</button>
-              )}
-              {isAdmin && !isMe && (
-                <button className="btn btn-danger btn-sm" onClick={async () => {
-                  const nb = JSON.parse(JSON.stringify(bracket))
-                  nb.teams = nb.teams.filter(x => x.id !== tm.id)
-                  await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
-                  reload()
-                }}>✕</button>
-              )}
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
+      )}
 
-        {!myTeam && !isFull && (
-          <button className="btn btn-primary mt8" style={{ width: '100%' }} onClick={() => setJoining(true)}>
-            + {t.joinTournament}
-          </button>
-        )}
-        {myTeam && (
-          <div style={{ marginTop: 8, fontSize: 12, color: '#10b981', textAlign: 'center', fontWeight: 600 }}>✓ {t.alreadyJoined}</div>
-        )}
-        {isFull && !myTeam && (
-          <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Tournoi complet.' : lang === 'he' ? 'הטורניר מלא.' : 'Tournament full.'}</div>
-        )}
-      </div>
-
-      {joining && (
-        <JoinTournamentModal t={t} lang={lang} me={me} players={players} tournament={tournament}
-          onClose={() => setJoining(false)} reload={reload} />
+      {addingTeam && (
+        <AddTeamManualModal t={t} lang={lang} players={players} unassigned={unassigned}
+          onClose={() => setAddingTeam(false)}
+          onAdd={async (p1id, p2id, name) => {
+            const nb = JSON.parse(JSON.stringify(bracket))
+            nb.teams = [...(nb.teams || []), { id: crypto.randomUUID(), name, player1_id: p1id, player2_id: p2id }]
+            await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+            reload(); setAddingTeam(false)
+          }} />
       )}
     </div>
   )
 }
 
-function JoinTournamentModal({ t, lang, me, players, tournament, onClose, reload }) {
-  const bracket = tournament.bracket || {}
-  const [partnerId, setPartnerId] = useState('')
-  const [teamName, setTeamName] = useState('')
+function AddTeamManualModal({ t, lang, players, unassigned, onClose, onAdd }) {
+  const [p1, setP1] = useState('')
+  const [p2, setP2] = useState('')
+  const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
-  const showToast = useToast()
 
-  const alreadyInTr = (bracket.teams || []).flatMap(tm => [tm.player1_id, tm.player2_id])
-  const available = players.filter(p => p.id !== me.id && !alreadyInTr.includes(p.id))
-
-  const partner = players.find(p => p.id === partnerId)
+  const p1Player = players.find(x => x.id === p1)
+  const p2Player = players.find(x => x.id === p2)
 
   useEffect(() => {
-    if (partner) setTeamName(me.name.split(' ')[0] + ' & ' + partner.name.split(' ')[0])
-    else setTeamName('')
-  }, [partnerId])
+    if (p1Player && p2Player) setName(p1Player.name.split(' ')[0] + ' & ' + p2Player.name.split(' ')[0])
+  }, [p1, p2])
 
-  async function handleJoin() {
-    if (!partnerId) return
+  async function handleAdd() {
+    if (!p1 || !p2 || p1 === p2) return
     setSaving(true)
-    const newTeam = {
-      id: crypto.randomUUID(),
-      name: teamName.trim() || (me.name.split(' ')[0] + ' & ' + (partner?.name.split(' ')[0] || '?')),
-      player1_id: me.id,
-      player2_id: partnerId
-    }
-    const nb = JSON.parse(JSON.stringify(bracket))
-    nb.teams = [...(nb.teams || []), newTeam]
-    const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    await onAdd(p1, p2, name.trim() || (p1Player?.name.split(' ')[0] + ' & ' + p2Player?.name.split(' ')[0]))
     setSaving(false)
-    if (error) { showToast(t.errorGeneric, 'err'); return }
-    reload()
-    showToast(t.tournamentJoined, 'ok')
-    onClose()
   }
+
+  const availableForP2 = unassigned.filter(id => id !== p1)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">+ {t.joinTournament}</div>
-
-        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.pickPartner}</div>
-        {available.length === 0 ? (
-          <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', padding: '12px 0' }}>
-            {lang === 'fr' ? 'Aucun joueur disponible.' : lang === 'he' ? 'אין שחקנים זמינים.' : 'No players available.'}
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-            {available.slice(0, 30).map(p => (
-              <button key={p.id} onClick={() => setPartnerId(p.id === partnerId ? '' : p.id)}
-                style={{ padding: '7px 14px', borderRadius: 20, border: `1px solid ${partnerId === p.id ? '#a855f7' : 'rgba(255,255,255,0.15)'}`, background: partnerId === p.id ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)', color: partnerId === p.id ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                {partnerId === p.id && '✓ '}{p.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {partnerId && (
+        <div className="modal-title">{lang === 'fr' ? 'Créer une équipe' : lang === 'he' ? 'צור קבוצה' : 'Create team'}</div>
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{lang === 'fr' ? 'Joueur 1' : lang === 'he' ? 'שחקן 1' : 'Player 1'}</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+          {unassigned.map(pid => {
+            const pl = players.find(x => x.id === pid)
+            return <button key={pid} onClick={() => { setP1(pid); if (p2 === pid) setP2('') }}
+              style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${p1 === pid ? '#a855f7' : 'rgba(255,255,255,0.15)'}`,
+                background: p1 === pid ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)',
+                color: p1 === pid ? '#c4b5fd' : '#9ca3af' }}>
+              {p1 === pid && '✓ '}{pl?.name || '?'}
+            </button>
+          })}
+        </div>
+        {p1 && (
           <>
-            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.teamNameLabel}</div>
-            <input className="input mb12" value={teamName} maxLength={40} onChange={e => setTeamName(e.target.value)} />
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{lang === 'fr' ? 'Joueur 2' : lang === 'he' ? 'שחקן 2' : 'Player 2'}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {availableForP2.map(pid => {
+                const pl = players.find(x => x.id === pid)
+                return <button key={pid} onClick={() => setP2(pid)}
+                  style={{ padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    border: `1px solid ${p2 === pid ? '#a855f7' : 'rgba(255,255,255,0.15)'}`,
+                    background: p2 === pid ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)',
+                    color: p2 === pid ? '#c4b5fd' : '#9ca3af' }}>
+                  {p2 === pid && '✓ '}{pl?.name || '?'}
+                </button>
+              })}
+            </div>
           </>
         )}
-
+        {p1 && p2 && (
+          <>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.teams}</div>
+            <input className="input mb12" value={name} maxLength={40} onChange={e => setName(e.target.value)} />
+          </>
+        )}
         <div className="row gap8">
           <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-          <button className="btn btn-primary flex1" disabled={saving || !partnerId} onClick={handleJoin}>
-            {saving ? <Spin /> : t.joinTournament}
+          <button className="btn btn-primary flex1" disabled={saving || !p1 || !p2 || p1 === p2} onClick={handleAdd}>
+            {saving ? <Spin /> : t.create}
           </button>
         </div>
       </div>
