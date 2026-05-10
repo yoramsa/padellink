@@ -226,6 +226,7 @@ const T = {
     leagueJoined:'✓ Ligue rejointe !',leagueLeft:'Demande de sortie envoyée.',
     wrongCode:'Code incorrect.',nameRequired:'Nom trop court (min. 2 car.).',cityRequired:'Ville requise.',
     maxPlayers:'Limite de joueurs',maxPlayersHint:'0 = illimité',leagueFull:'La ligue est complète',
+    deleteLeague:'Supprimer la ligue',confirmDeleteLeague:'Supprimer définitivement cette ligue et toutes ses données ?',
     leagueFormError:'Vous devez remplir toutes les cases pour pouvoir créer la ligue.',
     durationHint:'0 = illimité',
     drawDesc:'Mélange aléatoire — les équipes sont formées au hasard.',
@@ -293,6 +294,7 @@ const T = {
     leagueJoined:'✓ League joined!',leagueLeft:'Leave request sent.',
     wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
     maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
+    deleteLeague:'Delete league',confirmDeleteLeague:'Permanently delete this league and all its data?',
     leagueFormError:'You must fill all fields to create the league.',
     durationHint:'0 = unlimited',
     drawDesc:'Random shuffle — teams are formed randomly.',
@@ -360,6 +362,7 @@ const T = {
     leagueJoined:'✓ הצטרפת לליגה!',leagueLeft:'בקשת עזיבה נשלחה.',
     wrongCode:'קוד שגוי.',nameRequired:'שם קצר מדי (מינ. 2 תווים).',cityRequired:'עיר נדרשת.',
     maxPlayers:'מגבלת שחקנים',maxPlayersHint:'0 = ללא הגבלה',leagueFull:'הליגה מלאה',
+    deleteLeague:'מחק ליגה',confirmDeleteLeague:'למחוק לצמיתות את הליגה וכל הנתונים שלה?',
     leagueFormError:'עליך למלא את כל השדות כדי ליצור את הליגה.',
     durationHint:'0 = ללא הגבלה',
     drawDesc:'ערבוב אקראי — הקבוצות נוצרות באקראי.',
@@ -868,6 +871,11 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     await loadLeagues(0)
   }
 
+  async function deleteLeague(leagueId) {
+    await supabase.from('leagues').delete().eq('id', leagueId)
+    await loadLeagues(0)
+  }
+
   async function toggleSubAdmin(leagueId, playerId) {
     const lm = leagues.find(l => l.id === leagueId)?.league_members?.find(m => m.player_id === playerId)
     const newRole = lm?.role === 'sub_admin' ? 'member' : 'sub_admin'
@@ -998,7 +1006,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
                 requestLeave={requestLeave} resolveLeave={resolveLeave}
                 randomDrawTeams={randomDrawTeams} leaveRequests={leaveRequests}
                 onBack={() => { setViewLeagueId(null); setSelectedLeagueTab('ranking2') }}
-                loadLeagues={loadLeagues}
+                loadLeagues={loadLeagues} deleteLeague={deleteLeague}
                 tournaments={tournaments} loadTournaments={loadTournaments}
               />
             )}
@@ -1260,7 +1268,7 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
   const ps = sets.map(s => ({ a: parseInt(s.a) || 0, b: parseInt(s.b) || 0 })).filter(s => s.a > 0 || s.b > 0)
   const t1names = sel.slice(0, 2).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
   const t2names = sel.slice(2, 4).map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
-  const allSelectable = [me, ...players.filter(p => p.id !== me.id)]
+  const allSelectable = [me, ...followedPlayers.filter(p => p.id !== me.id)]
   const filtered = search.trim().length >= 1
     ? allSelectable.filter(p => p.id === me.id || p.name.toLowerCase().includes(search.toLowerCase()) || (p.city || '').toLowerCase().includes(search.toLowerCase()))
     : allSelectable
@@ -1305,7 +1313,14 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
               })}
               {filtered.length === 0 && <div style={{ padding: '12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Aucun joueur trouvé' : lang === 'he' ? 'שחקן לא נמצא' : 'No player found'}</div>}
             </div>
-            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 8px' }}>{sel.length}/4 · 👥 = {lang === 'fr' ? 'joueur suivi' : lang === 'he' ? 'עוקב' : 'followed'}</div>
+            <div style={{ fontSize: 10, color: '#6b7280', margin: '8px 0 8px' }}>
+              {sel.length}/4 · {lang === 'fr' ? `${followedPlayers.length} joueurs suivis disponibles` : lang === 'he' ? `${followedPlayers.length} שחקנים עוקבים זמינים` : `${followedPlayers.length} followed players available`}
+            </div>
+            {followedPlayers.length < 3 && (
+              <div style={{ fontSize: 11, color: '#f59e0b', padding: '8px 10px', background: 'rgba(245,158,11,0.07)', borderRadius: 8, marginBottom: 8 }}>
+                ⚠️ {lang === 'fr' ? 'Suis plus de joueurs pour créer un match !' : lang === 'he' ? 'עקוב אחרי יותר שחקנים כדי ליצור משחק!' : 'Follow more players to create a match!'}
+              </div>
+            )}
             <input className="input mb12" type="date" value={date} onChange={e => setDate(e.target.value)} />
             <div className="row gap8">
               <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
@@ -1815,7 +1830,7 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
 }
 
 // ══ LEAGUE VIEW ══
-function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, setSelectedTab, addLeagueMatch, expelMember, sendChatMsg, toggleSubAdmin, requestLeave, resolveLeave, randomDrawTeams, leaveRequests, onBack, loadLeagues, tournaments, loadTournaments }) {
+function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, setSelectedTab, addLeagueMatch, expelMember, sendChatMsg, toggleSubAdmin, requestLeave, resolveLeave, randomDrawTeams, leaveRequests, onBack, loadLeagues, deleteLeague, tournaments, loadTournaments }) {
   const isAdmin = league.admin_id === me.id
   const myRole = league.league_members?.find(lm => lm.player_id === me.id)?.role
   const isSubAdmin = myRole === 'sub_admin'
@@ -1823,8 +1838,17 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
   const hasLeaveReq = leaveRequests.some(r => r.league_id === league.id && r.player_id === me.id)
   const myLeaveReqs = leaveRequests.filter(r => r.league_id === league.id)
   const [leaveBusy, setLeaveBusy] = useState(false)
+  const [deletingLeague, setDeletingLeague] = useState(false)
   const showToast = useToast()
   const confirm = useConfirm()
+
+  async function handleDeleteLeague() {
+    const ok = await confirm(t.confirmDeleteLeague)
+    if (!ok) return
+    setDeletingLeague(true)
+    try { await deleteLeague(league.id); onBack() }
+    catch { showToast(t.errorGeneric, 'err'); setDeletingLeague(false) }
+  }
 
   const LTABS = [
     { id: 'ranking2', label: t.ranking2 },
@@ -1861,7 +1885,8 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
     <div>
       <div className="row" style={{ padding: '14px 16px 4px' }}>
         <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.leagues}</button>
-        <span className="fw700" style={{ fontSize: 14, marginLeft: 8 }}>{league.is_private ? '🔒 ' : '🌍 '}{league.name}</span>
+        <span className="fw700 flex1" style={{ fontSize: 14, marginLeft: 8 }}>{league.is_private ? '🔒 ' : '🌍 '}{league.name}</span>
+        {isAdmin && <button className="btn btn-danger btn-sm" disabled={deletingLeague} onClick={handleDeleteLeague}>🗑 {t.deleteLeague}</button>}
       </div>
       <div style={{ padding: '0 16px 6px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <span className="text-xs">{t.duration}: {league.match_duration}min</span>
@@ -1981,7 +2006,12 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
             <div style={{ flex: 1 }}>
               <select className="select" value={t2} onChange={e => setT2(e.target.value)}>
                 <option value="">{t.team2}</option>
-                {(league.teams || []).filter(tm => '' + tm.id !== t1).map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+                {(league.teams || []).filter(tm => '' + tm.id !== t1).map(tm => {
+                  const op1 = players.find(p => p.id === tm.player1_id)
+                  const op2 = players.find(p => p.id === tm.player2_id)
+                  const avg = op1 && op2 ? ((op1.level + op2.level) / 2).toFixed(1) : ''
+                  return <option key={tm.id} value={tm.id}>{tm.name}{avg ? ' (moy.' + avg + ')' : ''}</option>
+                })}
               </select>
               {t2 && <div style={{ fontSize: 10, color: '#a855f7', marginTop: 4 }}>{getTeamPNames(t2)}</div>}
             </div>
@@ -2004,17 +2034,30 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
       {leagueMatches.length === 0 && <div className="empty">{t.noMatchYet}</div>}
       {leagueMatches.slice().reverse().map(m => {
         const t1n = getTeamName(m.team1_id), t2n = getTeamName(m.team2_id)
+        const t1pn = getTeamPNames(m.team1_id), t2pn = getTeamPNames(m.team2_id)
         const w = (league.teams || []).find(x => x.id === m.winner_id)
+        const isT1Win = m.winner_id === m.team1_id, isT2Win = m.winner_id === m.team2_id
         return (
           <div key={m.id} className="card">
-            <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 700 }}>{t1n} {t.vs} {t2n}</span>
-              {m.played_at && <span className="text-xs">{m.played_at}</span>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: isT1Win ? '#06b6d4' : '#e2e8f0' }}>{isT1Win ? '🏆 ' : ''}{t1n}</div>
+                    {t1pn && <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1 }}>{t1pn}</div>}
+                  </div>
+                  <span style={{ fontSize: 11, color: '#4b5563', fontWeight: 700 }}>{t.vs}</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: isT2Win ? '#a855f7' : '#e2e8f0' }}>{isT2Win ? '🏆 ' : ''}{t2n}</div>
+                    {t2pn && <div style={{ fontSize: 10, color: '#6b7280', marginTop: 1 }}>{t2pn}</div>}
+                  </div>
+                </div>
+              </div>
+              {m.played_at && <span className="text-xs" style={{ flexShrink: 0, marginLeft: 8 }}>{m.played_at}</span>}
             </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {(m.sets || []).map((s, i) => <div key={i} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '4px 10px', fontFamily: "'Bebas Neue',cursive", fontSize: 18, color: s.a > s.b ? '#06b6d4' : s.b > s.a ? '#a855f7' : '#9ca3af' }}>{s.a}-{s.b}</div>)}
             </div>
-            {w && <div style={{ fontSize: 11, color: '#10b981' }}>🏆 {t.winner}: {w.name}</div>}
           </div>
         )
       })}
