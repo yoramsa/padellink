@@ -22,6 +22,7 @@ const T = {
     fullName: 'Prénom et nom',
     city: 'Ville',
     birthDate: 'Date de naissance',
+    phone: 'Téléphone (WhatsApp)',
     gameLevel: 'Niveau de jeu',
     levelWord: 'Niveau',
     yearsOld: 'ans',
@@ -31,6 +32,8 @@ const T = {
     cityError: 'Entre ta ville.',
     dobError: 'Entre ta date de naissance.',
     invalidDobError: 'Date de naissance invalide.',
+    phoneError: 'Entre un numéro de téléphone valide.',
+    phoneDuplicateError: 'Ce numéro est déjà utilisé. Si c\'est une erreur, contacte padellink-support@gmail.com',
     error: 'Erreur : '
   },
   en: {
@@ -41,6 +44,7 @@ const T = {
     fullName: 'First and last name',
     city: 'City',
     birthDate: 'Date of birth',
+    phone: 'Phone (WhatsApp)',
     gameLevel: 'Game level',
     levelWord: 'Level',
     yearsOld: 'years old',
@@ -50,6 +54,8 @@ const T = {
     cityError: 'Enter your city.',
     dobError: 'Enter your date of birth.',
     invalidDobError: 'Invalid date of birth.',
+    phoneError: 'Enter a valid phone number.',
+    phoneDuplicateError: 'This number is already in use. If this is a mistake, contact padellink-support@gmail.com',
     error: 'Error: '
   },
   he: {
@@ -60,6 +66,7 @@ const T = {
     fullName: 'שם פרטי ושם משפחה',
     city: 'עיר',
     birthDate: 'תאריך לידה',
+    phone: 'טלפון (וואטסאפ)',
     gameLevel: 'רמת משחק',
     levelWord: 'רמה',
     yearsOld: 'שנים',
@@ -69,6 +76,8 @@ const T = {
     cityError: 'הכנס את העיר שלך.',
     dobError: 'הכנס את תאריך הלידה שלך.',
     invalidDobError: 'תאריך לידה לא תקין.',
+    phoneError: 'הכנס מספר טלפון תקין.',
+    phoneDuplicateError: 'מספר זה כבר בשימוש. אם זו טעות, צור קשר עם padellink-support@gmail.com',
     error: 'שגיאה: '
   }
 }
@@ -109,6 +118,7 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
   const [name, setName] = useState(session.user.user_metadata?.name || '')
   const [city, setCity] = useState('')
   const [dob, setDob] = useState('')
+  const [phone, setPhone] = useState('')
   const [level, setLevel] = useState(2.0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -135,9 +145,18 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
     if (!city.trim() || city.trim().length < 2) { setError(t.cityError); return }
     if (!dob) { setError(t.dobError); return }
     if (currentAge === null || currentAge < 10 || currentAge > 100) { setError(t.invalidDobError); return }
+    const cleanPhone = phone.replace(/\s/g, '')
+    if (!cleanPhone || cleanPhone.length < 7) { setError(t.phoneError); return }
 
     setLoading(true)
     setError(null)
+
+    const { data: existing } = await supabase.from('players').select('id').eq('phone', cleanPhone).maybeSingle()
+    if (existing) {
+      setLoading(false)
+      setError(t.phoneDuplicateError)
+      return
+    }
 
     const { error: insertError } = await supabase.from('players').insert({
       user_id: session.user.id,
@@ -146,6 +165,7 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
       date_of_birth: dob,
       age: currentAge,
       level: level,
+      phone: cleanPhone,
       points: 0,
       wins: 0,
       matches: 0,
@@ -183,6 +203,9 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
           <div className="label">{t.city}</div>
           <input className="input" placeholder="Tel Aviv" value={city} maxLength={50} onChange={e => setCity(e.target.value)} />
 
+          <div className="label">{t.phone}</div>
+          <input className="input" type="tel" placeholder="+972 50 000 0000" value={phone} maxLength={20} onChange={e => setPhone(e.target.value)} />
+
           <div className="label">{t.birthDate}</div>
           <input className="input" type="date" value={dob} max={new Date().toISOString().split('T')[0]} onChange={e => setDob(e.target.value)} />
 
@@ -219,7 +242,7 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
             </div>
           </div>
 
-          <button className="btn" disabled={loading || !name || !city || !dob || currentAge < 10} onClick={handleSubmit}>
+          <button className="btn" disabled={loading || !name || !city || !dob || currentAge < 10 || !phone} onClick={handleSubmit}>
             {loading ? t.creating : t.createProfile}
           </button>
 

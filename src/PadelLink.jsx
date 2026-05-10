@@ -270,6 +270,8 @@ const T = {
     confirmDrawT:'Tirage aléatoire ? Les équipes existantes seront supprimées.',
     confirmBalanceT:'Équilibrer ? Les équipes existantes seront supprimées.',
     notEnoughForTeams:'Pas assez de joueurs (min 4).',
+    searchLeague:'Rechercher une ligue...',searchTournament:'Rechercher un tournoi...',
+    shareTournament:'Partager via WhatsApp',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -360,6 +362,8 @@ const T = {
     confirmDrawT:'Random draw? Existing teams will be deleted.',
     confirmBalanceT:'Balance teams? Existing teams will be deleted.',
     notEnoughForTeams:'Not enough players (min 4).',
+    searchLeague:'Search a league...',searchTournament:'Search a tournament...',
+    shareTournament:'Share via WhatsApp',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
@@ -450,6 +454,8 @@ const T = {
     confirmDrawT:'הגרלה אקראית? הקבוצות הקיימות יימחקו.',
     confirmBalanceT:'לאזן קבוצות? הקבוצות הקיימות יימחקו.',
     notEnoughForTeams:'לא מספיק שחקנים (מינ. 4).',
+    searchLeague:'חפש ליגה...',searchTournament:'חפש טורניר...',
+    shareTournament:'שתף בוואטסאפ',
   }
 }
 
@@ -616,7 +622,7 @@ function SkeletonCard({ lines = 2 }) {
 const LANG_LABELS = { fr: '🇫🇷 FR', en: '🇬🇧 EN', he: '🇮🇱 HE' }
 const ALL_LANGS = ['fr', 'en', 'he']
 
-export default function PadelLink({ session, player: initialPlayer, pendingLeagueId, onClearPendingLeague, onSignOut, lang, setLang }) {
+export default function PadelLink({ session, player: initialPlayer, pendingLeagueId, onClearPendingLeague, pendingTournamentId, onClearPendingTournament, onSignOut, lang, setLang }) {
   const [tab, setTab] = useState('home')
   const [me, setMe] = useState(initialPlayer)
   const [players, setPlayers] = useState([])
@@ -674,6 +680,13 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
       onClearPendingLeague?.()
     }
   }, [pendingLeagueId, loadingBg, leagues])
+
+  // Handle tournament invitation URL
+  useEffect(() => {
+    if (!pendingTournamentId || loadingBg) return
+    setTab('leagues')
+    setLeagueSection('tournaments')
+  }, [pendingTournamentId, loadingBg])
 
   // Phase 1: critical user data only → show UI fast
   // Phase 2: players + leagues (background)
@@ -951,6 +964,11 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   }
 
   async function deleteLeague(leagueId) {
+    await supabase.from('leave_requests').delete().eq('league_id', leagueId)
+    await supabase.from('matches').delete().eq('league_id', leagueId)
+    await supabase.from('teams').delete().eq('league_id', leagueId)
+    await supabase.from('league_members').delete().eq('league_id', leagueId)
+    await supabase.from('tournaments').delete().eq('league_id', leagueId)
     await supabase.from('leagues').delete().eq('id', leagueId)
     await loadLeagues(0)
   }
@@ -1087,6 +1105,8 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
                 {leagueSection === 'tournaments' && (
                   <TournamentListTab t={t} lang={lang} me={me} players={players}
                     tournaments={tournaments} loadTournaments={loadTournaments}
+                    pendingTournamentId={pendingTournamentId}
+                    onClearPendingTournament={onClearPendingTournament}
                   />
                 )}
               </>
@@ -1725,9 +1745,11 @@ function RatingModal({ t, lang, target, myExisting, submitRating, onClose }) {
 // ══ LEAGUES TAB ══
 function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, setViewLeagueId, setPreviewLeagueId }) {
   const [showCreate, setShowCreate] = useState(false)
+  const [search, setSearch] = useState('')
   const showToast = useToast()
-  const myLeagues = leagues.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
-  const otherLeagues = leagues.filter(l => !l.league_members?.some(lm => lm.player_id === me.id))
+  const filtered = search.trim().length >= 2 ? leagues.filter(l => l.name.toLowerCase().includes(search.toLowerCase())) : leagues
+  const myLeagues = filtered.filter(l => l.league_members?.some(lm => lm.player_id === me.id))
+  const otherLeagues = filtered.filter(l => !l.league_members?.some(lm => lm.player_id === me.id))
 
   function renderLeague(l) {
     const isMem = l.league_members?.some(lm => lm.player_id === me.id)
@@ -1770,6 +1792,9 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
         <div className="section-title" style={{ padding: 0 }}>{t.leagues}</div>
         <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>+ {t.createLeague}</button>
       </div>
+      <div style={{ padding: '10px 16px 4px' }}>
+        <input className="input" style={{ fontSize: 13 }} placeholder={t.searchLeague} value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
       {myLeagues.length > 0 && (
         <div>
           <div style={{ padding: '12px 16px 4px', fontSize: 11, color: '#a855f7', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myLeagues}</div>
@@ -1782,7 +1807,7 @@ function LeaguesTab({ t, lang, me, leagues, players, createLeague, joinLeague, s
           {otherLeagues.map(renderLeague)}
         </div>
       )}
-      {leagues.length === 0 && <div className="empty">{lang === 'fr' ? 'Aucune ligue.\nCrée la première ! 🎾' : lang === 'he' ? 'אין ליגות עדיין.\nצור את הראשונה! 🎾' : 'No leagues yet.\nCreate the first one! 🎾'}</div>}
+      {myLeagues.length === 0 && otherLeagues.length === 0 && <div className="empty">{search.trim() ? (lang === 'fr' ? 'Aucune ligue trouvée.' : lang === 'he' ? 'לא נמצאה ליגה.' : 'No league found.') : (lang === 'fr' ? 'Aucune ligue.\nCrée la première ! 🎾' : lang === 'he' ? 'אין ליגות עדיין.\nצור את הראשונה! 🎾' : 'No leagues yet.\nCreate the first one! 🎾')}</div>}
       {showCreate && (
         <CreateLeagueModal t={t} lang={lang}
           onCreate={async d => { try { await createLeague(d); setShowCreate(false); showToast(lang === 'fr' ? '✓ Ligue créée !' : lang === 'he' ? '✓ ליגה נוצרה!' : '✓ League created!', 'ok') } catch { showToast(t.errorGeneric, 'err') } }}
@@ -2535,16 +2560,23 @@ function computeRRStandings(bracket) {
 }
 
 // ── Standalone Tournaments section (top-level, not inside a league) ──
-function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments }) {
+function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments, pendingTournamentId, onClearPendingTournament }) {
   const [creating, setCreating] = useState(false)
   const [viewId, setViewId] = useState(null)
   const [codeEntry, setCodeEntry] = useState({})
+  const [search, setSearch] = useState('')
   const showToast = useToast()
   const confirm = useConfirm()
 
   function reload() { loadTournaments([]) }
 
   const allTr = tournaments || []
+
+  useEffect(() => {
+    if (!pendingTournamentId) return
+    const tr = allTr.find(x => x.id === pendingTournamentId)
+    if (tr) { setViewId(pendingTournamentId); onClearPendingTournament?.() }
+  }, [pendingTournamentId, allTr])
 
   function isMember(tr) {
     const mbs = tr.bracket?.members || []
@@ -2555,8 +2587,9 @@ function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments 
   }
   function isCreator(tr) { return tr.bracket?.creator_id === me.id }
 
-  const myTr = allTr.filter(tr => !tr.league_id && (isCreator(tr) || isMember(tr)))
-  const publicTr = allTr.filter(tr => !tr.league_id && !tr.bracket?.is_private && !isCreator(tr) && !isMember(tr))
+  const filteredTr = search.trim().length >= 2 ? allTr.filter(tr => tr.name?.toLowerCase().includes(search.toLowerCase())) : allTr
+  const myTr = filteredTr.filter(tr => !tr.league_id && (isCreator(tr) || isMember(tr)))
+  const publicTr = filteredTr.filter(tr => !tr.league_id && !tr.bracket?.is_private && !isCreator(tr) && !isMember(tr))
 
   const viewing = viewId ? allTr.find(tr => tr.id === viewId) : null
 
@@ -2654,6 +2687,7 @@ function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments 
       <button className="btn btn-primary mt4" style={{ width: '100%' }} onClick={() => setCreating(true)}>
         🎯 {t.createTournament}
       </button>
+      <input className="input mt8" style={{ fontSize: 13 }} placeholder={t.searchTournament} value={search} onChange={e => setSearch(e.target.value)} />
 
       {myTr.length > 0 && (
         <>
@@ -2911,7 +2945,14 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 4px' }}>
         <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.tournamentsSection}</button>
-        {isAdmin && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-green btn-sm" onClick={() => {
+            var url = window.location.origin + '?tournament=' + tournament.id
+            var msg = encodeURIComponent((lang === 'fr' ? 'Rejoins mon tournoi sur PadelLink ! ' : lang === 'he' ? 'הצטרף לטורניר שלי ב-PadelLink! ' : 'Join my tournament on PadelLink! ') + url)
+            window.open('https://wa.me/?text=' + msg, '_blank')
+          }}>📤 {t.shareTournament}</button>
+          {isAdmin && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
+        </div>
       </div>
       <div style={{ padding: '4px 16px 10px' }}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>{tournament.name}</div>

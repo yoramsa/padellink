@@ -9,6 +9,7 @@ export default function App() {
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [pendingLeagueId, setPendingLeagueId] = useState(null)
+  const [pendingTournamentId, setPendingTournamentId] = useState(null)
   const [lang, setLangState] = useState(() => localStorage.getItem('pl_lang') || 'en')
 
   function setLang(l) { setLangState(l); localStorage.setItem('pl_lang', l) }
@@ -16,8 +17,10 @@ export default function App() {
   useEffect(function() {
     const params = new URLSearchParams(window.location.search)
     const leagueParam = params.get('league')
-    if (leagueParam) {
-      setPendingLeagueId(leagueParam)
+    const tournamentParam = params.get('tournament')
+    if (leagueParam || tournamentParam) {
+      if (leagueParam) setPendingLeagueId(leagueParam)
+      if (tournamentParam) setPendingTournamentId(tournamentParam)
       window.history.replaceState({}, '', window.location.pathname)
     }
 
@@ -63,6 +66,8 @@ export default function App() {
       player={player}
       pendingLeagueId={pendingLeagueId}
       onClearPendingLeague={() => setPendingLeagueId(null)}
+      pendingTournamentId={pendingTournamentId}
+      onClearPendingTournament={() => setPendingTournamentId(null)}
       onSignOut={() => supabase.auth.signOut()}
       lang={lang}
       setLang={setLang}
