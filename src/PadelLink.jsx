@@ -157,6 +157,13 @@ const LEVELS = [
 
 const getLevelInfo = v => LEVELS.find(l => l.val === v) || LEVELS[2]
 
+function whatsappLink(phone) {
+  if (!phone) return null
+  var digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('0')) digits = digits.slice(1)
+  return 'https://wa.me/972' + digits
+}
+
 const RATING_KEYS = ['fairplay','service','reflex','power','level']
 const RATING_LABELS = {
   fr:{fairplay:'Fair Play',service:'Service',reflex:'Réflexe',power:'Puissance',level:'Niveau'},
@@ -191,6 +198,7 @@ const T = {
     editProfile:'Modifier le profil',name:'Nom',city:'Ville',
     showLevels:'Voir les niveaux',showBadges:'Mes badges',
     ratingsTitle:'Mes notes reçues',signOut:'Se déconnecter',
+    phone:'Téléphone',whatsapp:'WhatsApp',allCities:'Toutes les villes',allLevels:'Tous les niveaux',filterCity:'Ville',filterLevel:'Niveau',
     expel:'Expulser',privateCode:'Code d\'accès',enterCode:'Entrer le code',access:'Accéder',
     leagueName:'Nom de la ligue',season:'Saison',rules:'Règles',
     setsMatch:'Sets par match',matchDuration:'Durée (min)',minAge:'Âge minimum',
@@ -280,6 +288,7 @@ const T = {
     editProfile:'Edit profile',name:'Name',city:'City',
     showLevels:'See levels',showBadges:'My badges',
     ratingsTitle:'My ratings',signOut:'Sign out',
+    phone:'Phone',whatsapp:'WhatsApp',allCities:'All cities',allLevels:'All levels',filterCity:'City',filterLevel:'Level',
     expel:'Expel',privateCode:'Access code',enterCode:'Enter code',access:'Access',
     leagueName:'League name',season:'Season',rules:'Rules',
     setsMatch:'Sets per match',matchDuration:'Duration (min)',minAge:'Min age',
@@ -369,6 +378,7 @@ const T = {
     editProfile:'ערוך פרופיל',name:'שם',city:'עיר',
     showLevels:'ראה רמות',showBadges:'התגים שלי',
     ratingsTitle:'הדירוגים שלי',signOut:'התנתק',
+    phone:'טלפון',whatsapp:'וואטסאפ',allCities:'כל הערים',allLevels:'כל הרמות',filterCity:'עיר',filterLevel:'רמה',
     expel:'הוצא',privateCode:'קוד גישה',enterCode:'הכנס קוד',access:'כניסה',
     leagueName:'שם הליגה',season:'עונה',rules:'חוקים',
     setsMatch:'סטים למשחק',matchDuration:'משך (דק\')',minAge:'גיל מינימלי',
@@ -1448,11 +1458,13 @@ function CreateMatchModal({ t, lang, me, players, followedPlayers, leagues, onCr
 
 // ══ PLAYERS TAB ══
 function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggleFollow, isFollowing, submitRating, getMyRatingFor, setViewPlayerId }) {
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(0)
-  const [ratingModal, setRatingModal] = useState(null)
-  const [followingId, setFollowingId] = useState(null)
-  const showToast = useToast()
+  var [search, setSearch] = useState('')
+  var [page, setPage] = useState(0)
+  var [ratingModal, setRatingModal] = useState(null)
+  var [followingId, setFollowingId] = useState(null)
+  var [cityFilter, setCityFilter] = useState('')
+  var [levelFilter, setLevelFilter] = useState('')
+  var showToast = useToast()
 
   useEffect(() => {
     const timer = setTimeout(() => { setPage(0); loadPlayers(search, 0) }, 350)
@@ -1467,12 +1479,29 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
     setFollowingId(null)
   }
 
+  var cities = [...new Set(players.map(p => p.city).filter(Boolean))].sort()
+  var filteredPlayers = players.filter(p => {
+    if (cityFilter && p.city !== cityFilter) return false
+    if (levelFilter && String(p.level) !== levelFilter) return false
+    return true
+  })
+
   return (
     <div>
       <div style={{ padding: '12px 16px 8px' }}>
         <input className="input" placeholder={'🔍 ' + t.players + '...'} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-      {players.map(p => {
+      <div style={{ display: 'flex', gap: 8, padding: '0 16px 8px' }}>
+        <select className="select" style={{ flex: 1 }} value={cityFilter} onChange={e => setCityFilter(e.target.value)}>
+          <option value="">{t.allCities}</option>
+          {cities.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select className="select" style={{ flex: 1 }} value={levelFilter} onChange={e => setLevelFilter(e.target.value)}>
+          <option value="">{t.allLevels}</option>
+          {LEVELS.map(l => <option key={l.val} value={String(l.val)}>{l.val} — {l.label}</option>)}
+        </select>
+      </div>
+      {filteredPlayers.map(p => {
         const isMe = p.id === me.id
         const isF = isFollowing(p.id)
         const info = getLevelInfo(p.level)
@@ -1504,6 +1533,12 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
                     {busy ? <Spin /> : (isF ? t.unfollow : t.follow)}
                   </button>
                   <button className="btn btn-sm btn-outline" onClick={() => setRatingModal(p)}>⭐ {t.rate}</button>
+                  {p.phone && p.id !== me.id && (
+                    <a href={whatsappLink(p.phone)} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(37,211,102,0.15)', border: '1px solid rgba(37,211,102,0.35)', color: '#25d366', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                      💬 {t.whatsapp}
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -1585,6 +1620,12 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
               {followingBusy ? <Spin /> : (isF ? t.unfollow : t.follow)}
             </button>
             <button className="btn btn-outline btn-sm flex1" onClick={() => setShowRating(true)}>⭐ {t.rate}</button>
+            {player.phone && (
+              <a href={whatsappLink(player.phone)} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px', borderRadius: 10, background: 'rgba(37,211,102,0.15)', border: '1px solid rgba(37,211,102,0.35)', color: '#25d366', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
+                💬 {t.whatsapp}
+              </a>
+            )}
           </div>
         )}
       </div>
@@ -3801,10 +3842,11 @@ function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, s
 
 // ══ PROFILE ══
 function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leagues, leagueMatches, updateProfile, uploadPhoto, onSignOut }) {
-  const [editing, setEditing] = useState(false)
-  const [eName, setEName] = useState(me.name)
-  const [eCity, setECity] = useState(me.city)
-  const [eLevel, setELevel] = useState(me.level)
+  var [editing, setEditing] = useState(false)
+  var [eName, setEName] = useState(me.name)
+  var [eCity, setECity] = useState(me.city)
+  var [eLevel, setELevel] = useState(me.level)
+  var [editPhone, setEditPhone] = useState(me.phone || '')
   const [showLv, setShowLv] = useState(false)
   const [showBd, setShowBd] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -3834,7 +3876,7 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
     if (!eCity.trim()) { showToast(t.cityRequired, 'err'); return }
     setSaving(true)
     try {
-      await updateProfile({ name: eName.trim().slice(0, 50), city: eCity.trim().slice(0, 50), level: eLevel })
+      await updateProfile({ name: eName.trim().slice(0, 50), city: eCity.trim().slice(0, 50), level: eLevel, phone: editPhone.trim() })
       showToast(t.profileUpdated, 'ok')
       setEditing(false)
     } catch { showToast(t.errorGeneric, 'err') }
@@ -3873,6 +3915,7 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
             <div className="col flex1">
               <div className="fw700" style={{ fontSize: 18 }}>{me.name}</div>
               <div className="text-sm">{me.city} · {calcAge(me.date_of_birth) || me.age} {t.age}</div>
+              {me.phone && <div style={{ fontSize: 13, color: '#9ca3af' }}>📱 {me.phone}</div>}
               <LvBadge val={me.level} lang={lang} />
               {myBadges.length > 0 && <div style={{ marginTop: 4 }}>{myBadges.map((b, i) => <span key={i} className="badge-chip">{b}</span>)}</div>}
             </div>
@@ -3880,6 +3923,8 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
             <div className="col flex1" style={{ gap: 6 }}>
               <input className="input" value={eName} maxLength={50} onChange={e => setEName(e.target.value)} />
               <input className="input" value={eCity} maxLength={50} onChange={e => setECity(e.target.value)} />
+              <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{t.phone}</div>
+              <input className="input mb12" type="tel" value={editPhone} maxLength={20} onChange={e => setEditPhone(e.target.value)} placeholder="05X XXX XXXX" />
               <select className="select" value={eLevel} onChange={e => setELevel(parseFloat(e.target.value))}>
                 {LEVELS.map(lv => <option key={lv.val} value={lv.val}>{lv.val} — {lang === 'en' ? lv.labelEn : lang === 'he' ? lv.labelHe : lv.label}</option>)}
               </select>
@@ -3894,7 +3939,7 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
             </button>
           </div>
         ) : (
-          <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { setEName(me.name); setECity(me.city); setELevel(me.level); setEditing(true) }}>✏️ {t.editProfile}</button>
+          <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => { setEName(me.name); setECity(me.city); setELevel(me.level); setEditPhone(me.phone || ''); setEditing(true) }}>✏️ {t.editProfile}</button>
         )}
       </div>
 
