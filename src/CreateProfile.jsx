@@ -32,7 +32,7 @@ const T = {
     cityError: 'Entre ta ville.',
     dobError: 'Entre ta date de naissance.',
     invalidDobError: 'Date de naissance invalide.',
-    phoneError: 'Entre un numéro de téléphone valide.',
+    phoneError: 'Numéro invalide. Entre un numéro israélien valide (ex: 050 123 4567).',
     phoneDuplicateError: 'Ce numéro est déjà utilisé. Si c\'est une erreur, contacte padellink-support@gmail.com',
     error: 'Erreur : '
   },
@@ -54,7 +54,7 @@ const T = {
     cityError: 'Enter your city.',
     dobError: 'Enter your date of birth.',
     invalidDobError: 'Invalid date of birth.',
-    phoneError: 'Enter a valid phone number.',
+    phoneError: 'Invalid number. Enter a valid Israeli number (e.g. 050 123 4567).',
     phoneDuplicateError: 'This number is already in use. If this is a mistake, contact padellink-support@gmail.com',
     error: 'Error: '
   },
@@ -76,7 +76,7 @@ const T = {
     cityError: 'הכנס את העיר שלך.',
     dobError: 'הכנס את תאריך הלידה שלך.',
     invalidDobError: 'תאריך לידה לא תקין.',
-    phoneError: 'הכנס מספר טלפון תקין.',
+    phoneError: 'מספר לא תקין. הכנס מספר ישראלי תקין (לדוגמה: 050 123 4567).',
     phoneDuplicateError: 'מספר זה כבר בשימוש. אם זו טעות, צור קשר עם padellink-support@gmail.com',
     error: 'שגיאה: '
   }
@@ -145,8 +145,12 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
     if (!city.trim() || city.trim().length < 2) { setError(t.cityError); return }
     if (!dob) { setError(t.dobError); return }
     if (currentAge === null || currentAge < 10 || currentAge > 100) { setError(t.invalidDobError); return }
-    const cleanPhone = phone.replace(/\s/g, '')
-    if (!cleanPhone || cleanPhone.length < 7) { setError(t.phoneError); return }
+    var digits = phone.replace(/[\s\-().]/g, '')
+    if (digits.startsWith('+972')) digits = '0' + digits.slice(4)
+    else if (digits.startsWith('972')) digits = '0' + digits.slice(3)
+    var validIsraeli = /^0(5[0-9]|[234789]\d)\d{7}$/.test(digits)
+    if (!validIsraeli) { setError(t.phoneError); return }
+    var cleanPhone = digits
 
     setLoading(true)
     setError(null)
