@@ -2788,6 +2788,8 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
   const [lobbyTab, setLobbyTab] = useState('members')
   const [launching, setLaunching] = useState(false)
   const [addingTeam, setAddingTeam] = useState(false)
+  const [editingMax, setEditingMax] = useState(false)
+  const [newMaxTeams, setNewMaxTeams] = useState('')
   const showToast = useToast()
   const confirm = useConfirm()
 
@@ -2796,6 +2798,18 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
   const maxPlayers = maxTeams * 2
   const isFull = maxPlayers > 0 && members.length >= maxPlayers
   const canLaunch = teams.length >= 4
+
+  async function handleSaveMax() {
+    const val = parseInt(newMaxTeams) || 0
+    if (val > 0 && val < 4) { showToast(t.maxTeamsError, 'err'); return }
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.max_teams = val
+    const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    if (error) { showToast(t.errorGeneric, 'err'); return }
+    setEditingMax(false)
+    reload()
+    showToast(t.saved, 'ok')
+  }
 
   // Players not yet assigned to any team
   const assignedIds = teams.flatMap(tm => [tm.player1_id, tm.player2_id])
@@ -2904,11 +2918,32 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
         <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{typeLabel}{bracket.is_private && ' · 🔒'}</div>
       </div>
 
-      {/* Stats bar */}
       <div style={{ margin: '0 16px 12px', display: 'flex', gap: 10 }}>
         <div style={{ flex: 1, padding: '10px 12px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 12, textAlign: 'center' }}>
-          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 28, color: '#a855f7', lineHeight: 1 }}>{members.length}{maxPlayers > 0 ? '/' + maxPlayers : ''}</div>
+          <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 28, color: '#a855f7', lineHeight: 1 }}>
+            {members.length}
+            {editingMax ? (
+              <span style={{ fontFamily: 'inherit', fontSize: 14, color: '#6b7280' }}>/</span>
+            ) : (
+              maxPlayers > 0 ? <span style={{ fontSize: 18 }}>/{maxPlayers}</span> : ''
+            )}
+          </div>
           <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.membersRegistered}</div>
+          {isAdmin && !editingMax && (
+            <button onClick={() => { setNewMaxTeams(String(maxTeams)); setEditingMax(true) }}
+              style={{ marginTop: 6, fontSize: 10, color: '#a855f7', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
+              ✏️ {t.maxTeamsLabel}
+            </button>
+          )}
+          {isAdmin && editingMax && (
+            <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
+              <input type="number" min="0" max="64" value={newMaxTeams}
+                onChange={e => setNewMaxTeams(e.target.value)}
+                style={{ width: 54, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(139,92,246,0.5)', borderRadius: 6, color: '#fff', fontSize: 12, padding: '3px 6px', textAlign: 'center' }} />
+              <button onClick={handleSaveMax} style={{ fontSize: 10, background: '#7c3aed', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer', padding: '3px 8px', fontWeight: 700 }}>✓</button>
+              <button onClick={() => setEditingMax(false)} style={{ fontSize: 10, background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 6, color: '#9ca3af', cursor: 'pointer', padding: '3px 8px' }}>✕</button>
+            </div>
+          )}
         </div>
         <div style={{ flex: 1, padding: '10px 12px', background: canLaunch ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.04)', border: `1px solid ${canLaunch ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 12, textAlign: 'center' }}>
           <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 28, color: canLaunch ? '#10b981' : '#6b7280', lineHeight: 1 }}>{teams.length}</div>
