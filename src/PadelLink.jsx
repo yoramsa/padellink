@@ -247,6 +247,13 @@ const T = {
     bye:'Exempt',enterScore:'Saisir le score',tournamentWinner:'Champion du tournoi',
     tournamentFinished:'Tournoi terminé',deleteTournament:'Supprimer le tournoi',
     confirmDeleteTournament:'Supprimer ce tournoi définitivement ?',standingsRR:'Classement',
+    joinTournament:'Rejoindre',leaveTournament:'Quitter',launchTournament:'🚀 Lancer le tournoi',
+    lobbyStatus:'En attente',teamsRegistered:'équipes inscrites',minTeamsToLaunch:'Minimum 4 équipes pour lancer.',
+    pickPartner:'Choisir un partenaire',teamNameLabel:'Nom de l\'équipe',alreadyJoined:'Tu es déjà inscrit.',
+    joinWithCode:'Entrer le code',maxTeamsLabel:'Équipes max.',myTournaments:'Mes tournois',
+    publicTournaments:'Tournois publics',noPublicTournaments:'Aucun tournoi public pour l\'instant.',
+    tournamentCreated:'🎯 Tournoi créé !',tournamentLaunched:'🚀 Tournoi lancé !',
+    tournamentJoined:'✓ Équipe inscrite !',tournamentLeft:'Équipe retirée.',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -321,6 +328,13 @@ const T = {
     bye:'Bye',enterScore:'Enter score',tournamentWinner:'Tournament champion',
     tournamentFinished:'Tournament finished',deleteTournament:'Delete tournament',
     confirmDeleteTournament:'Permanently delete this tournament?',standingsRR:'Standings',
+    joinTournament:'Join',leaveTournament:'Leave',launchTournament:'🚀 Launch tournament',
+    lobbyStatus:'Waiting',teamsRegistered:'teams registered',minTeamsToLaunch:'Minimum 4 teams to launch.',
+    pickPartner:'Pick partner',teamNameLabel:'Team name',alreadyJoined:'You are already registered.',
+    joinWithCode:'Enter code',maxTeamsLabel:'Max teams',myTournaments:'My tournaments',
+    publicTournaments:'Public tournaments',noPublicTournaments:'No public tournaments yet.',
+    tournamentCreated:'🎯 Tournament created!',tournamentLaunched:'🚀 Tournament launched!',
+    tournamentJoined:'✓ Team registered!',tournamentLeft:'Team removed.',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
@@ -395,6 +409,13 @@ const T = {
     bye:'פטור',enterScore:'הכנס תוצאה',tournamentWinner:'אלוף הטורניר',
     tournamentFinished:'הטורניר הסתיים',deleteTournament:'מחק טורניר',
     confirmDeleteTournament:'למחוק טורניר זה לצמיתות?',standingsRR:'טבלת דירוג',
+    joinTournament:'הצטרף',leaveTournament:'עזוב',launchTournament:'🚀 הפעל טורניר',
+    lobbyStatus:'ממתין',teamsRegistered:'קבוצות רשומות',minTeamsToLaunch:'מינימום 4 קבוצות להפעלה.',
+    pickPartner:'בחר שותף',teamNameLabel:'שם הקבוצה',alreadyJoined:'אתה כבר רשום.',
+    joinWithCode:'הכנס קוד',maxTeamsLabel:'קבוצות מקס',myTournaments:'הטורנירים שלי',
+    publicTournaments:'טורנירים ציבוריים',noPublicTournaments:'אין טורנירים ציבוריים עדיין.',
+    tournamentCreated:'🎯 טורניר נוצר!',tournamentLaunched:'🚀 טורניר הופעל!',
+    tournamentJoined:'✓ קבוצה נרשמה!',tournamentLeft:'קבוצה הוסרה.',
   }
 }
 
@@ -717,8 +738,13 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   }
 
   async function loadTournaments(leagueIds) {
-    if (!leagueIds || !leagueIds.length) { setTournaments([]); return }
-    const { data } = await supabase.from('tournaments').select('*').in('league_id', leagueIds).order('created_at', { ascending: false })
+    let q = supabase.from('tournaments').select('*').order('created_at', { ascending: false }).limit(100)
+    if (leagueIds && leagueIds.length) {
+      q = q.or(`league_id.in.(${leagueIds.join(',')}),league_id.is.null`)
+    } else {
+      q = q.is('league_id', null)
+    }
+    const { data } = await q
     if (data) setTournaments(data)
   }
 
@@ -1025,7 +1051,7 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
                   />
                 )}
                 {leagueSection === 'tournaments' && (
-                  <TournamentListTab t={t} lang={lang} me={me} leagues={leagues} players={players}
+                  <TournamentListTab t={t} lang={lang} me={me} players={players}
                     tournaments={tournaments} loadTournaments={loadTournaments}
                   />
                 )}
@@ -2432,7 +2458,8 @@ function generateRRBracket(teamIds) {
 
 function computeRRStandings(bracket) {
   const stats = {}
-  ;(bracket.teams || []).forEach(t => { stats[t] = { teamId: t, W: 0, L: 0, P: 0 } })
+  const teamIds = (bracket.teams || []).map(t => typeof t === 'object' ? t.id : t)
+  teamIds.forEach(id => { stats[id] = { teamId: id, W: 0, L: 0, P: 0 } })
   ;(bracket.matches || []).forEach(m => {
     if (!m.played || !m.winner) return
     const loser = m.t1 === m.winner ? m.t2 : m.t1
@@ -2443,135 +2470,182 @@ function computeRRStandings(bracket) {
 }
 
 // ── Standalone Tournaments section (top-level, not inside a league) ──
-function TournamentListTab({ t, lang, me, leagues, players, tournaments, loadTournaments }) {
+function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments }) {
   const [creating, setCreating] = useState(false)
   const [viewId, setViewId] = useState(null)
+  const [codeEntry, setCodeEntry] = useState({})
   const showToast = useToast()
   const confirm = useConfirm()
 
-  const myLeagueIds = leagues.filter(l => {
-    const myRole = (l.league_members || []).find(m => m.player_id === me.id)?.role
-    return l.admin_id === me.id || myRole === 'sub_admin' || myRole === 'member'
-  }).map(l => l.id)
+  function reload() { loadTournaments([]) }
 
-  const myAdminLeagueIds = leagues.filter(l => {
-    const myRole = (l.league_members || []).find(m => m.player_id === me.id)?.role
-    return l.admin_id === me.id || myRole === 'sub_admin'
-  }).map(l => l.id)
+  const allTr = tournaments || []
 
-  const allTournaments = (tournaments || []).filter(tr => myLeagueIds.includes(tr.league_id))
+  function isMember(tr) {
+    const teams = tr.bracket?.teams || []
+    return teams.some(tm => typeof tm === 'object' && (tm.player1_id === me.id || tm.player2_id === me.id))
+  }
+  function isCreator(tr) { return tr.bracket?.creator_id === me.id }
 
-  const viewing = viewId ? allTournaments.find(tr => tr.id === viewId) : null
-  const viewingLeague = viewing ? leagues.find(l => l.id === viewing.league_id) : null
+  const myTr = allTr.filter(tr => !tr.league_id && (isCreator(tr) || isMember(tr)))
+  const publicTr = allTr.filter(tr => !tr.league_id && !tr.bracket?.is_private && !isCreator(tr) && !isMember(tr))
 
-  async function handleDelete(trId, leagueId) {
+  const viewing = viewId ? allTr.find(tr => tr.id === viewId) : null
+
+  async function handleDelete(trId) {
     const ok = await confirm(t.confirmDeleteTournament)
     if (!ok) return
     await supabase.from('tournaments').delete().eq('id', trId)
-    await loadTournaments(myLeagueIds)
     setViewId(null)
+    reload()
     showToast(lang === 'fr' ? 'Tournoi supprimé' : lang === 'he' ? 'טורניר נמחק' : 'Tournament deleted', 'ok')
   }
 
-  function reloadAll() { if (myLeagueIds.length) loadTournaments(myLeagueIds) }
-
-  if (viewing && viewingLeague) {
-    const isAdmin = viewingLeague.admin_id === me.id
-    const myRole = (viewingLeague.league_members || []).find(m => m.player_id === me.id)?.role
-    const isSubAdmin = myRole === 'sub_admin'
+  if (viewing) {
+    const bracket = viewing.bracket || {}
+    const isAdmin = bracket.creator_id === me.id
+    if (bracket.status === 'lobby') {
+      return (
+        <TournamentLobby t={t} lang={lang} me={me} players={players} tournament={viewing}
+          isAdmin={isAdmin} reload={reload}
+          onBack={() => setViewId(null)} onDelete={() => handleDelete(viewing.id)} />
+      )
+    }
     return (
-      <TournamentView t={t} lang={lang} tournament={viewing} league={viewingLeague} players={players}
-        isAdmin={isAdmin} isSubAdmin={isSubAdmin} loadTournaments={reloadAll}
-        onBack={() => setViewId(null)} onDelete={() => handleDelete(viewing.id, viewing.league_id)} />
+      <TournamentView t={t} lang={lang} tournament={viewing} league={null} players={players}
+        isAdmin={isAdmin} isSubAdmin={false} loadTournaments={reload}
+        onBack={() => setViewId(null)} onDelete={() => handleDelete(viewing.id)} />
+    )
+  }
+
+  function TrCard({ tr, showJoin }) {
+    const bracket = tr.bracket || {}
+    const isFinished = bracket.status === 'finished'
+    const isLobby = bracket.status === 'lobby'
+    const teamCount = (bracket.teams || []).length
+    const winnerTeam = bracket.winner ? (bracket.teams || []).find(tm => tm.id === bracket.winner) : null
+    const typeLabel = bracket.type === 'elimination'
+      ? (lang === 'fr' ? '🎯 Élim.' : lang === 'he' ? '🎯 נוקאאוט' : '🎯 Elim.')
+      : '🔄 Round Robin'
+    const code = codeEntry[tr.id] || ''
+    const isPrivate = bracket.is_private
+
+    function handleCardClick() {
+      if (isPrivate && !isMember(tr) && !isCreator(tr)) return
+      setViewId(tr.id)
+    }
+
+    async function handleJoinWithCode() {
+      if (isPrivate && code.trim().toUpperCase() !== (bracket.access_code || '').toUpperCase()) {
+        showToast(t.wrongCode, 'err'); return
+      }
+      setViewId(tr.id)
+    }
+
+    const statusColor = isFinished ? '#10b981' : isLobby ? '#a855f7' : '#f59e0b'
+    const statusBg = isFinished ? 'rgba(16,185,129,0.15)' : isLobby ? 'rgba(139,92,246,0.15)' : 'rgba(245,158,11,0.15)'
+    const statusBorder = isFinished ? 'rgba(16,185,129,0.3)' : isLobby ? 'rgba(139,92,246,0.3)' : 'rgba(245,158,11,0.3)'
+    const statusLabel = isFinished ? (lang === 'fr' ? '✓ Terminé' : lang === 'he' ? '✓ הסתיים' : '✓ Done')
+      : isLobby ? (lang === 'fr' ? '⏳ Lobby' : lang === 'he' ? '⏳ לובי' : '⏳ Lobby')
+      : (lang === 'fr' ? '▶ En cours' : lang === 'he' ? '▶ פעיל' : '▶ Active')
+
+    return (
+      <div className="card mt8" style={{ cursor: isPrivate && !isMember(tr) && !isCreator(tr) ? 'default' : 'pointer' }}
+        onClick={handleCardClick}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isPrivate && showJoin ? 10 : 0 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+              {isPrivate && <span style={{ fontSize: 10 }}>🔒</span>}
+              <div style={{ fontSize: 15, fontWeight: 700 }}>{tr.name}</div>
+            </div>
+            <div style={{ fontSize: 11, color: '#9ca3af' }}>{typeLabel} · {teamCount} {t.teamsRegistered}</div>
+            {isFinished && winnerTeam && (
+              <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, marginTop: 4 }}>🥇 {winnerTeam.name}</div>
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, flexShrink: 0,
+            background: statusBg, color: statusColor, border: `1px solid ${statusBorder}` }}>
+            {statusLabel}
+          </span>
+        </div>
+        {isPrivate && showJoin && (
+          <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input className="input" style={{ flex: 1, fontSize: 12, padding: '8px 10px' }}
+              placeholder={t.joinWithCode} value={code}
+              onChange={e => setCodeEntry(prev => ({ ...prev, [tr.id]: e.target.value }))} />
+            <button className="btn btn-primary btn-sm" onClick={handleJoinWithCode}>{t.joinTournament}</button>
+          </div>
+        )}
+      </div>
     )
   }
 
   return (
     <div style={{ padding: '8px 16px 0' }}>
-      {myAdminLeagueIds.length > 0 ? (
-        <button className="btn btn-primary mt4" style={{ width: '100%' }} onClick={() => setCreating(true)}>
-          🎯 {t.createTournament}
-        </button>
-      ) : (
-        <div style={{ margin: '12px 0', padding: '14px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 14, fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>
-          {t.noLeagueForTournament}
-        </div>
+      <button className="btn btn-primary mt4" style={{ width: '100%' }} onClick={() => setCreating(true)}>
+        🎯 {t.createTournament}
+      </button>
+
+      {myTr.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 4px' }}>{t.myTournaments}</div>
+          {myTr.map(tr => <TrCard key={tr.id} tr={tr} showJoin={false} />)}
+        </>
       )}
-      {allTournaments.length === 0 && <div className="empty mt8">{t.noTournaments}</div>}
-      {allTournaments.map(tr => {
-        const league = leagues.find(l => l.id === tr.league_id)
-        const bracket = tr.bracket || {}
-        const isFinished = bracket.status === 'finished'
-        const winnerTeam = bracket.winner ? (league?.teams || []).find(tm => tm.id === bracket.winner) : null
-        const typeLabel = bracket.type === 'elimination'
-          ? (lang === 'fr' ? '🎯 Élimination' : lang === 'he' ? '🎯 נוקאאוט' : '🎯 Elimination')
-          : (lang === 'fr' ? '🔄 Round Robin' : lang === 'he' ? '🔄 ליגה' : '🔄 Round Robin')
-        return (
-          <div key={tr.id} className="card mt8" onClick={() => setViewId(tr.id)} style={{ cursor: 'pointer' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{tr.name}</div>
-                {league && <div style={{ fontSize: 11, color: '#a855f7', fontWeight: 600, marginBottom: 4 }}>🏆 {league.name}</div>}
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>{typeLabel} · {(bracket.teams || []).length} {t.teams.toLowerCase()}</div>
-                {isFinished && winnerTeam && (
-                  <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 700, marginTop: 6 }}>🥇 {winnerTeam.name}</div>
-                )}
-              </div>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, flexShrink: 0,
-                background: isFinished ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-                color: isFinished ? '#10b981' : '#f59e0b',
-                border: `1px solid ${isFinished ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}` }}>
-                {isFinished ? (lang === 'fr' ? '✓ Terminé' : lang === 'he' ? '✓ הסתיים' : '✓ Done') : (lang === 'fr' ? '▶ En cours' : lang === 'he' ? '▶ פעיל' : '▶ Active')}
-              </span>
-            </div>
-          </div>
-        )
-      })}
+
+      {publicTr.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, margin: '16px 0 4px' }}>{t.publicTournaments}</div>
+          {publicTr.map(tr => <TrCard key={tr.id} tr={tr} showJoin={true} />)}
+        </>
+      )}
+
+      {myTr.length === 0 && publicTr.length === 0 && (
+        <div className="empty mt8">{t.noTournaments}</div>
+      )}
+
       {creating && (
-        <CreateStandaloneTournamentModal t={t} lang={lang} me={me}
-          leagues={leagues.filter(l => myAdminLeagueIds.includes(l.id))}
-          players={players}
-          onClose={() => setCreating(false)}
-          loadTournaments={reloadAll}
-        />
+        <CreateTournamentFormModal t={t} lang={lang} me={me}
+          onClose={() => setCreating(false)} reload={reload} />
       )}
     </div>
   )
 }
 
-function CreateStandaloneTournamentModal({ t, lang, me, leagues, players, onClose, loadTournaments }) {
-  const [selectedLeagueId, setSelectedLeagueId] = useState(leagues[0]?.id || '')
+function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
   const [name, setName] = useState('')
   const [type, setType] = useState('elimination')
-  const [selectedTeams, setSelectedTeams] = useState([])
   const [hasThirdPlace, setHasThirdPlace] = useState(true)
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [code, setCode] = useState('')
+  const [maxTeams, setMaxTeams] = useState('8')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
   const showToast = useToast()
 
-  const league = leagues.find(l => l.id === selectedLeagueId)
-  const allTeams = league?.teams || []
-
-  function toggleTeam(teamId) {
-    setSelectedTeams(prev => prev.includes(teamId) ? prev.filter(x => x !== teamId) : [...prev, teamId])
-  }
-
-  function handleLeagueChange(id) {
-    setSelectedLeagueId(id)
-    setSelectedTeams([])
-  }
-
   async function handleCreate() {
-    if (!name.trim()) { setErr(lang === 'fr' ? 'Entrez un nom.' : lang === 'he' ? 'הכנס שם.' : 'Enter a name.'); return }
-    if (!selectedLeagueId) { setErr(lang === 'fr' ? 'Sélectionnez une ligue.' : lang === 'he' ? 'בחר ליגה.' : 'Select a league.'); return }
-    if (selectedTeams.length < 2) { setErr(lang === 'fr' ? 'Sélectionnez au moins 2 équipes.' : lang === 'he' ? 'בחר לפחות 2 קבוצות.' : 'Select at least 2 teams.'); return }
+    if (!name.trim() || name.trim().length < 2) { setErr(t.nameRequired); return }
+    const max = parseInt(maxTeams) || 0
     setSaving(true); setErr(null)
-    const bracket = type === 'elimination' ? generateElimBracket(selectedTeams, hasThirdPlace) : generateRRBracket(selectedTeams)
-    const { error } = await supabase.from('tournaments').insert({ league_id: selectedLeagueId, name: name.trim(), type, bracket })
+    const bracket = {
+      creator_id: me.id,
+      status: 'lobby',
+      type,
+      has_third_place: hasThirdPlace,
+      is_private: isPrivate,
+      access_code: isPrivate ? code.trim().toUpperCase() : '',
+      max_teams: max,
+      teams: [],
+      rounds: [],
+      matches: [],
+      winner: null, second: null, third: null,
+      third_place_match: hasThirdPlace ? { id: '3rd', t1: null, t2: null, sets: [], winner: null } : null
+    }
+    const { error } = await supabase.from('tournaments').insert({ league_id: null, name: name.trim(), type, bracket })
     setSaving(false)
     if (error) { setErr(error.message); return }
-    loadTournaments()
-    showToast(lang === 'fr' ? '🏆 Tournoi créé !' : lang === 'he' ? '🏆 טורניר נוצר!' : '🏆 Tournament created!', 'ok')
+    reload()
+    showToast(t.tournamentCreated, 'ok')
     onClose()
   }
 
@@ -2580,19 +2654,18 @@ function CreateStandaloneTournamentModal({ t, lang, me, leagues, players, onClos
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">🎯 {t.createTournament}</div>
 
-        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.selectLeagueForTournament}</div>
-        <select className="select mb12" value={selectedLeagueId} onChange={e => handleLeagueChange(e.target.value)}>
-          {leagues.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-
         <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.tournamentName}</div>
-        <input className="input mb12" value={name} onChange={e => setName(e.target.value)}
-          placeholder={lang === 'fr' ? 'Coupe de Tel Aviv' : lang === 'he' ? 'גביע תל אביב' : 'Tel Aviv Cup'} maxLength={60} />
+        <input className="input mb12" value={name} maxLength={60}
+          onChange={e => setName(e.target.value)}
+          placeholder={lang === 'fr' ? 'Coupe de Tel Aviv' : lang === 'he' ? 'גביע תל אביב' : 'Tel Aviv Cup'} />
 
         <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.tournamentType}</div>
         <div className="row gap8 mb12">
           {['elimination', 'roundrobin'].map(tp => (
-            <button key={tp} onClick={() => setType(tp)} style={{ flex: 1, padding: '10px 8px', borderRadius: 12, border: `1px solid ${type === tp ? '#a855f7' : 'rgba(255,255,255,0.1)'}`, background: type === tp ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: type === tp ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>
+            <button key={tp} onClick={() => setType(tp)} style={{ flex: 1, padding: '10px 8px', borderRadius: 12,
+              border: `1px solid ${type === tp ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
+              background: type === tp ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+              color: type === tp ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
               {tp === 'elimination' ? '🎯 ' + t.elimination : '🔄 ' + t.roundRobin}
             </button>
           ))}
@@ -2607,34 +2680,231 @@ function CreateStandaloneTournamentModal({ t, lang, me, leagues, players, onClos
           </div>
         )}
 
-        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-          {t.selectTournamentTeams} ({selectedTeams.length}/{allTeams.length})
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.maxTeamsLabel}</div>
+        <input className="input mb12" type="number" min="4" max="32" value={maxTeams}
+          onChange={e => setMaxTeams(e.target.value)}
+          placeholder="8" />
+
+        <div className="row mb12" style={{ cursor: 'pointer' }} onClick={() => setIsPrivate(!isPrivate)}>
+          <div className={'toggle-track ' + (isPrivate ? 'on' : '')}><div className="toggle-thumb" /></div>
+          <span style={{ fontSize: 13, color: '#e2e8f0', marginLeft: 10 }}>{t.privateToggleLabel}</span>
         </div>
-        {allTeams.length === 0 ? (
-          <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', padding: '12px 0', marginBottom: 12 }}>
-            {lang === 'fr' ? 'Créez d\'abord des équipes dans la ligue.' : lang === 'he' ? 'צור תחילה קבוצות בליגה.' : 'Create teams first in the league.'}
-          </div>
-        ) : (
-          <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {allTeams.map(tm => {
-              const p1 = players.find(p => p.id === tm.player1_id)
-              const p2 = players.find(p => p.id === tm.player2_id)
-              const selected = selectedTeams.includes(tm.id)
-              return (
-                <button key={tm.id} onClick={() => toggleTeam(tm.id)} style={{ padding: '7px 14px', borderRadius: 20, border: `1px solid ${selected ? '#a855f7' : 'rgba(255,255,255,0.15)'}`, background: selected ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)', color: selected ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                  {selected && '✓ '}{tm.name}
-                  {p1 && p2 && <span style={{ fontSize: 10, opacity: 0.6 }}> ({((p1.level + p2.level) / 2).toFixed(1)})</span>}
-                </button>
-              )
-            })}
-          </div>
+
+        {isPrivate && (
+          <>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.privateCode}</div>
+            <input className="input mb12" value={code} maxLength={20} onChange={e => setCode(e.target.value.toUpperCase())}
+              placeholder={lang === 'fr' ? 'CODE123' : lang === 'he' ? 'קוד123' : 'CODE123'} />
+          </>
         )}
 
         {err && <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 10, textAlign: 'center' }}>{err}</div>}
         <div className="row gap8">
           <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
-          <button className="btn btn-primary flex1" disabled={saving || !name.trim() || selectedTeams.length < 2} onClick={handleCreate}>
-            {saving ? <Spin /> : t.startTournament}
+          <button className="btn btn-primary flex1" disabled={saving || !name.trim()} onClick={handleCreate}>
+            {saving ? <Spin /> : t.create}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, onBack, onDelete }) {
+  const bracket = tournament.bracket || {}
+  const teams = bracket.teams || []
+  const [joining, setJoining] = useState(false)
+  const [launching, setLaunching] = useState(false)
+  const showToast = useToast()
+  const confirm = useConfirm()
+
+  const myTeam = teams.find(tm => tm.player1_id === me.id || tm.player2_id === me.id)
+  const maxTeams = bracket.max_teams || 0
+  const isFull = maxTeams > 0 && teams.length >= maxTeams
+  const canLaunch = teams.length >= 4
+
+  async function handleLeave() {
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.teams = nb.teams.filter(tm => tm.player1_id !== me.id && tm.player2_id !== me.id)
+    const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    if (error) { showToast(t.errorGeneric, 'err'); return }
+    reload()
+    showToast(t.tournamentLeft, 'info')
+  }
+
+  async function handleLaunch() {
+    const ok = await confirm(t.launchTournament + ' ?')
+    if (!ok) return
+    setLaunching(true)
+    const teamIds = teams.map(tm => tm.id)
+    const newData = bracket.type === 'elimination'
+      ? generateElimBracket(teamIds, bracket.has_third_place)
+      : generateRRBracket(teamIds)
+    const nb = {
+      ...newData,
+      teams: teams,
+      creator_id: bracket.creator_id,
+      is_private: bracket.is_private,
+      access_code: bracket.access_code,
+      max_teams: bracket.max_teams,
+      has_third_place: bracket.has_third_place,
+    }
+    const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    setLaunching(false)
+    if (error) { showToast(t.errorGeneric, 'err'); return }
+    reload()
+    showToast(t.tournamentLaunched, 'ok')
+    onBack()
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 4px' }}>
+        <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.tournamentsSection}</button>
+        {isAdmin && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
+      </div>
+      <div style={{ padding: '6px 16px 10px' }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>{tournament.name}</div>
+        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
+          {bracket.type === 'elimination'
+            ? (lang === 'fr' ? '🎯 Élimination directe' : lang === 'he' ? '🎯 נוקאאוט' : '🎯 Single Elimination')
+            : (lang === 'fr' ? '🔄 Round Robin' : lang === 'he' ? '🔄 ליגה' : '🔄 Round Robin')}
+          {bracket.is_private && ' · 🔒'}
+        </div>
+      </div>
+
+      <div style={{ margin: '0 16px 12px', padding: '12px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 32, color: '#a855f7', lineHeight: 1 }}>{teams.length}{maxTeams > 0 ? '/' + maxTeams : ''}</div>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{t.teamsRegistered}</div>
+          </div>
+          {!canLaunch && <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600, textAlign: 'right' }}>{t.minTeamsToLaunch}</div>}
+          {canLaunch && isAdmin && (
+            <button className="btn btn-primary" disabled={launching} onClick={handleLaunch}>
+              {launching ? <Spin /> : t.launchTournament}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: '0 16px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.teams}</div>
+        {teams.length === 0 && <div className="empty" style={{ padding: '16px 0' }}>{t.noMatchYet}</div>}
+        {teams.map(tm => {
+          const p1 = players.find(p => p.id === tm.player1_id)
+          const p2 = players.find(p => p.id === tm.player2_id)
+          const isMe = tm.player1_id === me.id || tm.player2_id === me.id
+          return (
+            <div key={tm.id} className="card" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>{tm.name}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>{p1?.name || '?'} & {p2?.name || '?'}</div>
+              </div>
+              {isMe && (
+                <button className="btn btn-danger btn-sm" onClick={handleLeave}>{t.leaveTournament}</button>
+              )}
+              {isAdmin && !isMe && (
+                <button className="btn btn-danger btn-sm" onClick={async () => {
+                  const nb = JSON.parse(JSON.stringify(bracket))
+                  nb.teams = nb.teams.filter(x => x.id !== tm.id)
+                  await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+                  reload()
+                }}>✕</button>
+              )}
+            </div>
+          )
+        })}
+
+        {!myTeam && !isFull && (
+          <button className="btn btn-primary mt8" style={{ width: '100%' }} onClick={() => setJoining(true)}>
+            + {t.joinTournament}
+          </button>
+        )}
+        {myTeam && (
+          <div style={{ marginTop: 8, fontSize: 12, color: '#10b981', textAlign: 'center', fontWeight: 600 }}>✓ {t.alreadyJoined}</div>
+        )}
+        {isFull && !myTeam && (
+          <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', textAlign: 'center' }}>{lang === 'fr' ? 'Tournoi complet.' : lang === 'he' ? 'הטורניר מלא.' : 'Tournament full.'}</div>
+        )}
+      </div>
+
+      {joining && (
+        <JoinTournamentModal t={t} lang={lang} me={me} players={players} tournament={tournament}
+          onClose={() => setJoining(false)} reload={reload} />
+      )}
+    </div>
+  )
+}
+
+function JoinTournamentModal({ t, lang, me, players, tournament, onClose, reload }) {
+  const bracket = tournament.bracket || {}
+  const [partnerId, setPartnerId] = useState('')
+  const [teamName, setTeamName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const showToast = useToast()
+
+  const alreadyInTr = (bracket.teams || []).flatMap(tm => [tm.player1_id, tm.player2_id])
+  const available = players.filter(p => p.id !== me.id && !alreadyInTr.includes(p.id))
+
+  const partner = players.find(p => p.id === partnerId)
+
+  useEffect(() => {
+    if (partner) setTeamName(me.name.split(' ')[0] + ' & ' + partner.name.split(' ')[0])
+    else setTeamName('')
+  }, [partnerId])
+
+  async function handleJoin() {
+    if (!partnerId) return
+    setSaving(true)
+    const newTeam = {
+      id: crypto.randomUUID(),
+      name: teamName.trim() || (me.name.split(' ')[0] + ' & ' + (partner?.name.split(' ')[0] || '?')),
+      player1_id: me.id,
+      player2_id: partnerId
+    }
+    const nb = JSON.parse(JSON.stringify(bracket))
+    nb.teams = [...(nb.teams || []), newTeam]
+    const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
+    setSaving(false)
+    if (error) { showToast(t.errorGeneric, 'err'); return }
+    reload()
+    showToast(t.tournamentJoined, 'ok')
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">+ {t.joinTournament}</div>
+
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.pickPartner}</div>
+        {available.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', padding: '12px 0' }}>
+            {lang === 'fr' ? 'Aucun joueur disponible.' : lang === 'he' ? 'אין שחקנים זמינים.' : 'No players available.'}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+            {available.slice(0, 30).map(p => (
+              <button key={p.id} onClick={() => setPartnerId(p.id === partnerId ? '' : p.id)}
+                style={{ padding: '7px 14px', borderRadius: 20, border: `1px solid ${partnerId === p.id ? '#a855f7' : 'rgba(255,255,255,0.15)'}`, background: partnerId === p.id ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)', color: partnerId === p.id ? '#c4b5fd' : '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                {partnerId === p.id && '✓ '}{p.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {partnerId && (
+          <>
+            <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.teamNameLabel}</div>
+            <input className="input mb12" value={teamName} maxLength={40} onChange={e => setTeamName(e.target.value)} />
+          </>
+        )}
+
+        <div className="row gap8">
+          <button className="btn btn-outline flex1" onClick={onClose}>{t.cancelBtn}</button>
+          <button className="btn btn-primary flex1" disabled={saving || !partnerId} onClick={handleJoin}>
+            {saving ? <Spin /> : t.joinTournament}
           </button>
         </div>
       </div>
@@ -2662,9 +2932,11 @@ function TournamentTab({ t, lang, league, players, isAdmin, isSubAdmin, tourname
     showToast(lang === 'fr' ? 'Tournoi supprimé' : lang === 'he' ? 'טורניר נמחק' : 'Tournament deleted', 'ok')
   }
 
+  function reloadLeague() { loadTournaments([league.id]) }
+
   if (viewing) return (
     <TournamentView t={t} lang={lang} tournament={viewing} league={league} players={players}
-      isAdmin={isAdmin} isSubAdmin={isSubAdmin} loadTournaments={loadTournaments}
+      isAdmin={isAdmin} isSubAdmin={isSubAdmin} loadTournaments={reloadLeague}
       onBack={() => setViewId(null)} onDelete={() => handleDelete(viewing.id)} />
   )
 
@@ -2803,7 +3075,12 @@ function TournamentView({ t, lang, tournament, league, players, isAdmin, isSubAd
   const bracket = tournament.bracket || {}
   const canEdit = isAdmin || isSubAdmin
   const isFinished = bracket.status === 'finished'
-  function getTeamName(id) { return (league.teams || []).find(tm => tm.id === id)?.name || '?' }
+  function getTeamName(id) {
+    if (!id) return ''
+    const teams = bracket.teams || []
+    if (teams.length && typeof teams[0] === 'object') return teams.find(tm => tm.id === id)?.name || '?'
+    return (league?.teams || []).find(tm => tm.id === id)?.name || '?'
+  }
 
   return (
     <div>
@@ -2924,7 +3201,9 @@ function BracketView({ t, lang, tournament, league, players, canEdit, loadTourna
 
   function getTeamName(id) {
     if (!id) return lang === 'fr' ? 'À déterminer' : lang === 'he' ? 'לא נקבע' : 'TBD'
-    return (league.teams || []).find(tm => tm.id === id)?.name || '?'
+    const teams = bracket.teams || []
+    if (teams.length && typeof teams[0] === 'object') return teams.find(tm => tm.id === id)?.name || '?'
+    return (league?.teams || []).find(tm => tm.id === id)?.name || '?'
   }
 
   function getRoundLabel(r, totalRounds) {
@@ -2962,7 +3241,7 @@ function BracketView({ t, lang, tournament, league, players, canEdit, loadTourna
     }
     const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
     if (error) { showToast(t.errorGeneric, 'err'); return }
-    await loadTournaments([league.id])
+    await loadTournaments()
     setScoreModal(null)
     showToast(t.saved, 'ok')
   }
@@ -2978,7 +3257,7 @@ function BracketView({ t, lang, tournament, league, players, canEdit, loadTourna
     nb.status = 'finished'
     const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
     if (error) { showToast(t.errorGeneric, 'err'); return }
-    await loadTournaments([league.id])
+    await loadTournaments()
     setScoreModal(null)
     showToast(t.saved, 'ok')
   }
@@ -3037,7 +3316,9 @@ function RoundRobinView({ t, lang, tournament, league, players, canEdit, loadTou
 
   function getTeamName(id) {
     if (!id) return '?'
-    return (league.teams || []).find(tm => tm.id === id)?.name || '?'
+    const teams = bracket.teams || []
+    if (teams.length && typeof teams[0] === 'object') return teams.find(tm => tm.id === id)?.name || '?'
+    return (league?.teams || []).find(tm => tm.id === id)?.name || '?'
   }
 
   async function handleSave(matchId, sets) {
@@ -3056,7 +3337,7 @@ function RoundRobinView({ t, lang, tournament, league, players, canEdit, loadTou
     }
     const { error } = await supabase.from('tournaments').update({ bracket: nb }).eq('id', tournament.id)
     if (error) { showToast(t.errorGeneric, 'err'); return }
-    await loadTournaments([league.id])
+    await loadTournaments()
     setScoreModal(null)
     showToast(t.saved, 'ok')
   }
