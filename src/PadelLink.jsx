@@ -1067,6 +1067,7 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
   const [showCreate, setShowCreate] = useState(false)
   const [respondingId, setRespondingId] = useState(null)
   const [resolvingId, setResolvingId] = useState(null)
+  const [showAllMatches, setShowAllMatches] = useState(false)
   const showToast = useToast()
 
   async function handleRespond(matchId, accepted) {
@@ -1179,12 +1180,15 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
         />
       )}
 
-      <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches} ({myMatches.length})</div>
+      <div style={{ padding: '0 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches} ({myMatches.length})</span>
+        {myMatches.length > 3 && <button style={{ fontSize: 11, color: '#a855f7', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }} onClick={() => setShowAllMatches(v => !v)}>{showAllMatches ? (lang === 'fr' ? '▲ Réduire' : lang === 'he' ? '▲ צמצם' : '▲ Show less') : (lang === 'fr' ? '▼ Tout voir' : lang === 'he' ? '▼ הצג הכל' : '▼ Show all')}</button>}
+      </div>
       {loadingBg && myMatches.length === 0 && (
         <div>{[1,2,3].map(i => <SkeletonCard key={i} lines={2} />)}</div>
       )}
       {!loadingBg && myMatches.length === 0 && <div className="empty">{t.noMatches}</div>}
-      {myMatches.slice().reverse().slice(0, 10).map(m => {
+      {myMatches.slice().reverse().slice(0, showAllMatches ? undefined : 3).map(m => {
         const isLeagueMatch = !!m.league_id
         const league = isLeagueMatch ? leagues.find(l => l.id === m.league_id) : null
         let t1n = '?', t2n = '?', iWon = false
@@ -1435,6 +1439,7 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
   const [showRating, setShowRating] = useState(false)
   const [followingBusy, setFollowingBusy] = useState(false)
   const [allPlayerRatings, setAllPlayerRatings] = useState(null)
+  const [showAllPlayerMatches, setShowAllPlayerMatches] = useState(false)
   const showToast = useToast()
 
   useEffect(() => {
@@ -1515,8 +1520,11 @@ function PlayerProfile({ t, lang, me, player, players, follows, ratings, myMatch
       </div>
       {playerMatches.length > 0 && (
         <div>
-          <div style={{ padding: '0 16px 4px', fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches}</div>
-          {playerMatches.slice(0, 6).map(m => {
+          <div style={{ padding: '0 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t.myMatches} ({playerMatches.length})</span>
+            {playerMatches.length > 3 && <button style={{ fontSize: 11, color: '#a855f7', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }} onClick={() => setShowAllPlayerMatches(v => !v)}>{showAllPlayerMatches ? (lang === 'fr' ? '▲ Réduire' : lang === 'he' ? '▲ צמצם' : '▲ Less') : (lang === 'fr' ? '▼ Tout voir' : lang === 'he' ? '▼ הצג הכל' : '▼ All')}</button>}
+          </div>
+          {playerMatches.slice(0, showAllPlayerMatches ? undefined : 3).map(m => {
             const league = m.league_id ? leagues.find(l => l.id === m.league_id) : null
             const t1n = league ? league.teams?.find(x => x.id === m.team1_id)?.name || 'Éq.1' : [m.player1_id, m.player2_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
             const t2n = league ? league.teams?.find(x => x.id === m.team2_id)?.name || 'Éq.2' : [m.player3_id, m.player4_id].map(id => players.find(p => p.id === id)?.name?.split(' ')[0] || '?').join(' & ')
