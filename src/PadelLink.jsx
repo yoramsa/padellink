@@ -157,6 +157,20 @@ const LEVELS = [
 
 const getLevelInfo = v => LEVELS.find(l => l.val === v) || LEVELS[2]
 
+const VALID_LEVELS = new Set([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+
+function sanitize(s) {
+  return String(s || '').replace(/[<>"'`]/g, '').trim()
+}
+
+function normalizeIsraeliPhone(raw) {
+  var d = String(raw || '').replace(/[\s\-().]/g, '')
+  if (d.startsWith('+972')) d = '0' + d.slice(4)
+  else if (d.startsWith('972')) d = '0' + d.slice(3)
+  if (/^0(5[0-9]|[234789]\d)\d{7}$/.test(d)) return d
+  return null
+}
+
 function whatsappLink(phone) {
   if (!phone) return null
   var digits = phone.replace(/\D/g, '')
@@ -272,6 +286,7 @@ const T = {
     notEnoughForTeams:'Pas assez de joueurs (min 4).',
     searchLeague:'Rechercher une ligue...',searchTournament:'Rechercher un tournoi...',
     shareTournament:'Partager via WhatsApp',
+    phoneInvalid:'Numéro invalide. Format attendu : 050 123 4567.',
   },
   en:{
     home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
@@ -364,6 +379,7 @@ const T = {
     notEnoughForTeams:'Not enough players (min 4).',
     searchLeague:'Search a league...',searchTournament:'Search a tournament...',
     shareTournament:'Share via WhatsApp',
+    phoneInvalid:'Invalid number. Expected format: 050 123 4567.',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
@@ -456,6 +472,7 @@ const T = {
     notEnoughForTeams:'לא מספיק שחקנים (מינ. 4).',
     searchLeague:'חפש ליגה...',searchTournament:'חפש טורניר...',
     shareTournament:'שתף בוואטסאפ',
+    phoneInvalid:'מספר לא תקין. פורמט צפוי: 050 123 4567.',
   }
 }
 
@@ -692,11 +709,9 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   // Phase 2: players + leagues (background)
   async function loadAll() {
     setLoadingData(true)
-    await Promise.all([loadFollows(), loadRatings(), loadFreeMatches(), loadLeaveRequests()])
+    await Promise.all([loadFollows(), loadFreeMatches(), loadLeaveRequests()])
     setLoadingData(false)
-    // Background phase
-    await Promise.all([loadPlayers('', 0), loadLeagues(0)])
-    await loadLeagueMatches()
+    await Promise.all([loadPlayers('', 0), loadLeagues(0), loadRatings(), loadLeagueMatches()])
     setLoadingBg(false)
   }
 
@@ -916,11 +931,16 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   // ── Leagues ──
   async function createLeague(data) {
     const { data: newL, error } = await supabase.from('leagues').insert({
-      name: data.name, season: data.season, rules: data.rules,
-      sets_per_match: data.setsPerMatch, match_duration: data.matchDuration,
-      min_age: data.minAge, is_private: data.isPrivate,
-      access_code_hash: data.isPrivate ? data.code : null, admin_id: me.id,
-      max_players: data.maxPlayers || 0
+      name: sanitize(data.name).slice(0, 60),
+      season: sanitize(data.season).slice(0, 60),
+      rules: sanitize(data.rules).slice(0, 1000),
+      sets_per_match: Math.min(Math.max(parseInt(data.setsPerMatch) || 3, 1), 5),
+      match_duration: Math.min(Math.max(parseInt(data.matchDuration) || 0, 0), 300),
+      min_age: Math.min(Math.max(parseInt(data.minAge) || 0, 0), 100),
+      is_private: Boolean(data.isPrivate),
+      access_code_hash: data.isPrivate ? sanitize(data.code).slice(0, 30) : null,
+      admin_id: me.id,
+      max_players: Math.min(Math.max(parseInt(data.maxPlayers) || 0, 0), 200)
     }).select().single()
     if (error) throw error
     await supabase.from('league_members').insert({ league_id: newL.id, player_id: me.id, role: 'admin' })
@@ -981,6 +1001,14 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   }
 
   async function addLeagueMatch(leagueId, matchData) {
+    if (!matchData.team1Id || !matchData.team2Id || matchData.team1Id === matchData.team2Id)
+      return { message: t.errorGeneric }
+    if (!Array.isArray(matchData.sets) || matchData.sets.length === 0 || matchData.sets.length > 5)
+      return { message: t.errorGeneric }
+    const validSets = matchData.sets.every(s =>
+      Number.isInteger(s.a) && Number.isInteger(s.b) && s.a >= 0 && s.b >= 0 && s.a <= 9 && s.b <= 9
+    )
+    if (!validSets) return { message: t.errorGeneric }
     const { error } = await supabase.from('matches').insert({
       league_id: leagueId, team1_id: matchData.team1Id, team2_id: matchData.team2Id,
       sets: matchData.sets, winner_id: matchData.winnerId,
@@ -991,7 +1019,9 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   }
 
   async function sendChatMsg(leagueId, text) {
-    await supabase.from('chat_messages').insert({ league_id: leagueId, player_id: me.id, content: text.trim().slice(0, 500) })
+    var content = sanitize(text).slice(0, 500)
+    if (!content) return
+    await supabase.from('chat_messages').insert({ league_id: leagueId, player_id: me.id, content })
   }
 
   async function randomDrawTeams(leagueId) {
@@ -2746,7 +2776,7 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
       winner: null, second: null, third: null,
       third_place_match: hasThirdPlace ? { id: '3rd', t1: null, t2: null, sets: [], winner: null } : null
     }
-    const { error } = await supabase.from('tournaments').insert({ league_id: null, name: name.trim(), type, bracket })
+    const { error } = await supabase.from('tournaments').insert({ league_id: null, name: sanitize(name).slice(0, 60), type, bracket })
     setSaving(false)
     if (error) { setErr(error.message); return }
     reload()
@@ -2949,7 +2979,7 @@ function TournamentLobby({ t, lang, me, players, tournament, isAdmin, reload, on
           <button className="btn btn-green btn-sm" onClick={() => {
             var url = window.location.origin + '?tournament=' + tournament.id
             var msg = encodeURIComponent((lang === 'fr' ? 'Rejoins mon tournoi sur PadelLink ! ' : lang === 'he' ? 'הצטרף לטורניר שלי ב-PadelLink! ' : 'Join my tournament on PadelLink! ') + url)
-            window.open('https://wa.me/?text=' + msg, '_blank')
+            window.open('https://wa.me/?text=' + msg, '_blank', 'noopener,noreferrer')
           }}>📤 {t.shareTournament}</button>
           {isAdmin && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
         </div>
@@ -3950,9 +3980,20 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
   async function save() {
     if (!eName.trim() || eName.trim().length < 2) { showToast(t.nameRequired, 'err'); return }
     if (!eCity.trim()) { showToast(t.cityRequired, 'err'); return }
+    if (!VALID_LEVELS.has(eLevel)) { showToast(t.errorGeneric, 'err'); return }
+    var cleanPhone = null
+    if (editPhone.trim()) {
+      cleanPhone = normalizeIsraeliPhone(editPhone)
+      if (!cleanPhone) { showToast(t.phoneInvalid, 'err'); return }
+    }
     setSaving(true)
     try {
-      await updateProfile({ name: eName.trim().slice(0, 50), city: eCity.trim().slice(0, 50), level: eLevel, phone: editPhone.trim() })
+      await updateProfile({
+        name: sanitize(eName).slice(0, 50),
+        city: sanitize(eCity).slice(0, 50),
+        level: eLevel,
+        phone: cleanPhone
+      })
       showToast(t.profileUpdated, 'ok')
       setEditing(false)
     } catch { showToast(t.errorGeneric, 'err') }

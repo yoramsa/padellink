@@ -1,8 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from './supabase'
 import Auth from './Auth'
 import CreateProfile from './CreateProfile'
-import PadelLink from './PadelLink'
+
+const PadelLink = lazy(() => import('./PadelLink'))
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function Loader() {
+  return (
+    <div style={{
+      minHeight: '100vh', background: '#0e0e16', display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Plus Jakarta Sans,sans-serif',
+      color: '#a855f7', fontSize: 18, fontWeight: 700, letterSpacing: 2
+    }}>
+      ⚡ PADELLINK...
+    </div>
+  )
+}
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -19,8 +35,8 @@ export default function App() {
     const leagueParam = params.get('league')
     const tournamentParam = params.get('tournament')
     if (leagueParam || tournamentParam) {
-      if (leagueParam) setPendingLeagueId(leagueParam)
-      if (tournamentParam) setPendingTournamentId(tournamentParam)
+      if (leagueParam && UUID_RE.test(leagueParam)) setPendingLeagueId(leagueParam)
+      if (tournamentParam && UUID_RE.test(tournamentParam)) setPendingTournamentId(tournamentParam)
       window.history.replaceState({}, '', window.location.pathname)
     }
 
@@ -46,31 +62,23 @@ export default function App() {
     setLoading(false)
   }
 
-  if (loading) return (
-    <div style={{
-      minHeight: '100vh', background: '#0e0e16', display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'Plus Jakarta Sans,sans-serif',
-      color: '#a855f7', fontSize: 18, fontWeight: 700, letterSpacing: 2
-    }}>
-      ⚡ PADELLINK...
-    </div>
-  )
-
+  if (loading) return <Loader />
   if (!session) return <Auth lang={lang} setLang={setLang} />
   if (!player) return <CreateProfile session={session} onCreated={() => loadPlayer(session.user.id)} lang={lang} setLang={setLang} />
 
   return (
-    <PadelLink
-      session={session}
-      player={player}
-      pendingLeagueId={pendingLeagueId}
-      onClearPendingLeague={() => setPendingLeagueId(null)}
-      pendingTournamentId={pendingTournamentId}
-      onClearPendingTournament={() => setPendingTournamentId(null)}
-      onSignOut={() => supabase.auth.signOut()}
-      lang={lang}
-      setLang={setLang}
-    />
+    <Suspense fallback={<Loader />}>
+      <PadelLink
+        session={session}
+        player={player}
+        pendingLeagueId={pendingLeagueId}
+        onClearPendingLeague={() => setPendingLeagueId(null)}
+        pendingTournamentId={pendingTournamentId}
+        onClearPendingTournament={() => setPendingTournamentId(null)}
+        onSignOut={() => supabase.auth.signOut()}
+        lang={lang}
+        setLang={setLang}
+      />
+    </Suspense>
   )
 }

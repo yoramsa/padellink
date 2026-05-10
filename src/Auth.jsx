@@ -65,15 +65,17 @@ export default function Auth({ lang, setLang }) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
   const [isError, setIsError] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
 
   const t = T[lang] || T.en
 
   async function handleMagicLink() {
-    if (!email || !email.includes('@')) {
+    if (!email || !email.includes('@') || !email.includes('.')) {
       setMessage(t.emailError)
       setIsError(true)
       return
     }
+    if (cooldown > 0) return
     setLoading(true)
     setMessage(null)
     const { error } = await supabase.auth.signInWithOtp({
@@ -87,6 +89,11 @@ export default function Auth({ lang, setLang }) {
     } else {
       setMessage(t.sent)
       setIsError(false)
+      setCooldown(60)
+      const interval = setInterval(() => setCooldown(c => {
+        if (c <= 1) { clearInterval(interval); return 0 }
+        return c - 1
+      }), 1000)
     }
   }
 
@@ -112,14 +119,14 @@ export default function Auth({ lang, setLang }) {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleMagicLink()}
+            onKeyDown={e => e.key === 'Enter' && !cooldown && handleMagicLink()}
           />
           <button
             className="btn"
-            disabled={loading || !email}
+            disabled={loading || !email || cooldown > 0}
             onClick={handleMagicLink}
           >
-            {loading ? t.sending : t.sendBtn}
+            {loading ? t.sending : cooldown > 0 ? `${t.sendBtn} (${cooldown}s)` : t.sendBtn}
           </button>
           {message && (
             <div className={`msg ${isError ? 'msg-error' : 'msg-success'}`}>
