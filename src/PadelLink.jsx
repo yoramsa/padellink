@@ -227,6 +227,9 @@ const T = {
     wrongCode:'Code incorrect.',nameRequired:'Nom trop court (min. 2 car.).',cityRequired:'Ville requise.',
     maxPlayers:'Limite de joueurs',maxPlayersHint:'0 = illimité',leagueFull:'La ligue est complète',
     deleteLeague:'Supprimer la ligue',confirmDeleteLeague:'Supprimer définitivement cette ligue et toutes ses données ?',
+    antiCheatTitle:'🔒 Scores verrouillés',
+    antiCheatDesc:'Pour éviter la triche, le scoring n\'est activé que si la ligue a au moins 6 joueurs et 3 équipes.',
+    antiCheatMembers:'Joueurs',antiCheatTeams:'Équipes',antiCheatOf:'/ 6 min.',antiCheatOfTeams:'/ 3 min.',
     leagueFormError:'Vous devez remplir toutes les cases pour pouvoir créer la ligue.',
     durationHint:'0 = illimité',
     drawDesc:'Mélange aléatoire — les équipes sont formées au hasard.',
@@ -295,6 +298,9 @@ const T = {
     wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
     maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
     deleteLeague:'Delete league',confirmDeleteLeague:'Permanently delete this league and all its data?',
+    antiCheatTitle:'🔒 Scoring locked',
+    antiCheatDesc:'To prevent cheating, scoring is only unlocked when the league has at least 6 players and 3 teams.',
+    antiCheatMembers:'Players',antiCheatTeams:'Teams',antiCheatOf:'/ 6 min.',antiCheatOfTeams:'/ 3 min.',
     leagueFormError:'You must fill all fields to create the league.',
     durationHint:'0 = unlimited',
     drawDesc:'Random shuffle — teams are formed randomly.',
@@ -363,6 +369,9 @@ const T = {
     wrongCode:'קוד שגוי.',nameRequired:'שם קצר מדי (מינ. 2 תווים).',cityRequired:'עיר נדרשת.',
     maxPlayers:'מגבלת שחקנים',maxPlayersHint:'0 = ללא הגבלה',leagueFull:'הליגה מלאה',
     deleteLeague:'מחק ליגה',confirmDeleteLeague:'למחוק לצמיתות את הליגה וכל הנתונים שלה?',
+    antiCheatTitle:'🔒 תוצאות נעולות',
+    antiCheatDesc:'כדי למנוע רמאות, הוספת תוצאות מופעלת רק כשיש לפחות 6 שחקנים ו-3 קבוצות בליגה.',
+    antiCheatMembers:'שחקנים',antiCheatTeams:'קבוצות',antiCheatOf:'/ מינ. 6',antiCheatOfTeams:'/ מינ. 3',
     leagueFormError:'עליך למלא את כל השדות כדי ליצור את הליגה.',
     durationHint:'0 = ללא הגבלה',
     drawDesc:'ערבוב אקראי — הקבוצות נוצרות באקראי.',
@@ -1843,6 +1852,9 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
   const myRole = league.league_members?.find(lm => lm.player_id === me.id)?.role
   const isSubAdmin = myRole === 'sub_admin'
   const canPostScore = isAdmin || isSubAdmin
+  const memberCount = league.league_members?.length || 0
+  const teamCount = league.teams?.length || 0
+  const meetsAntiCheat = memberCount >= 6 && teamCount >= 3
   const hasLeaveReq = leaveRequests.some(r => r.league_id === league.id && r.player_id === me.id)
   const myLeaveReqs = leaveRequests.filter(r => r.league_id === league.id)
   const [leaveBusy, setLeaveBusy] = useState(false)
@@ -1932,7 +1944,7 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
         {LTABS.map(lt => <button key={lt.id} className={'tab-pill ' + (selectedTab === lt.id ? 'active' : '')} onClick={() => setSelectedTab(lt.id)}>{lt.label}</button>)}
       </div>
       {selectedTab === 'ranking2' && <LeagueStandings t={t} standings={computeStandings()} />}
-      {selectedTab === 'matches' && <LeagueMatchesTab t={t} lang={lang} league={league} players={players} leagueMatches={leagueMatches} addLeagueMatch={addLeagueMatch} canPostScore={canPostScore} />}
+      {selectedTab === 'matches' && <LeagueMatchesTab t={t} lang={lang} league={league} players={players} leagueMatches={leagueMatches} addLeagueMatch={addLeagueMatch} canPostScore={canPostScore} meetsAntiCheat={meetsAntiCheat} memberCount={memberCount} teamCount={teamCount} />}
       {selectedTab === 'teams' && <LeagueTeamsTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} isSubAdmin={isSubAdmin} randomDrawTeams={randomDrawTeams} loadLeagues={loadLeagues} />}
       {selectedTab === 'tournament' && <TournamentTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} isSubAdmin={isSubAdmin} tournaments={tournaments} loadTournaments={loadTournaments} />}
       {selectedTab === 'members' && <LeagueMembersTab t={t} lang={lang} league={league} players={players} isAdmin={isAdmin} expelMember={expelMember} toggleSubAdmin={toggleSubAdmin} me={me} />}
@@ -1965,7 +1977,7 @@ function LeagueStandings({ t, standings }) {
   )
 }
 
-function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMatch, canPostScore }) {
+function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMatch, canPostScore, meetsAntiCheat, memberCount, teamCount }) {
   const [t1, setT1] = useState('')
   const [t2, setT2] = useState('')
   const [sets, setSets] = useState([{ a: '', b: '' }])
@@ -1994,7 +2006,25 @@ function LeagueMatchesTab({ t, lang, league, players, leagueMatches, addLeagueMa
 
   return (
     <div style={{ padding: '0 16px' }}>
-      {canPostScore ? (
+      {!meetsAntiCheat && (
+        <div style={{ margin: '8px 0', padding: '14px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>{t.antiCheatTitle}</div>
+          <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.6, marginBottom: 12 }}>{t.antiCheatDesc}</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 26, color: memberCount >= 6 ? '#10b981' : '#ef4444' }}>{memberCount}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.antiCheatMembers} {t.antiCheatOf}</div>
+              {memberCount >= 6 && <div style={{ fontSize: 12, color: '#10b981' }}>✓</div>}
+            </div>
+            <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px', textAlign: 'center' }}>
+              <div style={{ fontFamily: "'Bebas Neue',cursive", fontSize: 26, color: teamCount >= 3 ? '#10b981' : '#ef4444' }}>{teamCount}</div>
+              <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>{t.antiCheatTeams} {t.antiCheatOfTeams}</div>
+              {teamCount >= 3 && <div style={{ fontSize: 12, color: '#10b981' }}>✓</div>}
+            </div>
+          </div>
+        </div>
+      )}
+      {canPostScore && meetsAntiCheat ? (
         <div className="card mt8">
           <div className="fw600 mb8" style={{ fontSize: 13 }}>{t.addMatch}</div>
           <div className="row gap8 mb4">
