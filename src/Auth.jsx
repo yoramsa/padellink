@@ -17,6 +17,11 @@ const STYLES = `
   .btn{width:100%;padding:13px;border-radius:12px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;background:linear-gradient(135deg,#7c3aed,#06b6d4);color:#fff;margin-top:4px;transition:opacity 0.2s;}
   .btn:hover{opacity:0.9;}
   .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .btn-google{width:100%;padding:13px;border-radius:12px;border:1px solid rgba(255,255,255,0.15);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:14px;background:rgba(255,255,255,0.07);color:#fff;margin-top:8px;transition:background 0.2s;display:flex;align-items:center;justify-content:center;gap:10px;}
+  .btn-google:hover{background:rgba(255,255,255,0.12);}
+  .btn-google:disabled{opacity:0.5;cursor:not-allowed;}
+  .divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:#4b5563;font-size:12px;}
+  .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.08);}
   .msg{margin-top:14px;padding:10px 14px;border-radius:10px;font-size:12px;text-align:center;}
   .msg-success{background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;}
   .msg-error{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;}
@@ -34,6 +39,8 @@ const T = {
     sendBtn: '✉️ Envoyer le lien magique',
     sent: '✉️ Lien envoyé ! Vérifie ta boîte mail et clique sur le lien pour te connecter.',
     firstLogin: 'Première connexion = création automatique de ton compte',
+    googleBtn: 'Continuer avec Google',
+    orDivider: 'ou',
   },
   en: {
     subtitle: 'THE PADEL COMMUNITY IN ISRAEL',
@@ -44,6 +51,8 @@ const T = {
     sendBtn: '✉️ Send magic link',
     sent: '✉️ Link sent! Check your inbox and click the link to sign in.',
     firstLogin: 'First login = automatic account creation',
+    googleBtn: 'Continue with Google',
+    orDivider: 'or',
   },
   he: {
     subtitle: 'קהילת הפאדל בישראל',
@@ -54,6 +63,8 @@ const T = {
     sendBtn: '✉️ שלח קישור קסם',
     sent: '✉️ קישור נשלח! בדוק את תיבת הדואר שלך ולחץ על הקישור.',
     firstLogin: 'כניסה ראשונה = יצירת חשבון אוטומטית',
+    googleBtn: 'המשך עם Google',
+    orDivider: 'או',
   }
 }
 
@@ -63,11 +74,21 @@ const ALL_LANGS = ['fr', 'en', 'he']
 export default function Auth({ lang, setLang }) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [message, setMessage] = useState(null)
   const [isError, setIsError] = useState(false)
   const [cooldown, setCooldown] = useState(0)
 
   const t = T[lang] || T.en
+
+  async function handleGoogle() {
+    setGoogleLoading(true)
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    })
+    setGoogleLoading(false)
+  }
 
   async function handleMagicLink() {
     if (!email || !email.includes('@') || !email.includes('.')) {
@@ -112,6 +133,11 @@ export default function Auth({ lang, setLang }) {
         <div className="auth-sub">{t.subtitle}</div>
         <div className="auth-card">
           <div className="auth-title">{t.title}</div>
+          <button className="btn-google" disabled={googleLoading} onClick={handleGoogle}>
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            {googleLoading ? '...' : t.googleBtn}
+          </button>
+          <div className="divider">{t.orDivider}</div>
           <div className="auth-desc">{t.desc}</div>
           <input
             className="input"
