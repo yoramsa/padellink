@@ -99,6 +99,10 @@ const STYLES = `
   @keyframes shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes podiumRise{from{transform:scaleY(0);opacity:0}to{transform:scaleY(1);opacity:1}}
+  @keyframes podiumFadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes confettiFall{0%{transform:translateY(-10px) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(800deg);opacity:0}}
+  @keyframes trophyBounce{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.15) rotate(3deg)}}
   .skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.03) 25%,rgba(255,255,255,0.07) 50%,rgba(255,255,255,0.03) 75%);background-size:1200px 100%;animation:shimmer 1.6s infinite linear;border-radius:10px;}
   .toast-wrap{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:500;width:calc(100% - 32px);max-width:398px;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
   .toast{padding:12px 18px;border-radius:14px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.6);animation:slideDown 0.25s ease;}
@@ -287,6 +291,10 @@ const T = {
     searchLeague:'Rechercher une ligue...',searchTournament:'Rechercher un tournoi...',
     shareTournament:'Partager via WhatsApp',
     phoneInvalid:'Numéro invalide. Format attendu : 050 123 4567.',
+    endLeague:'🏆 Fin de la ligue',endTournamentBtn:'🏆 Voir le podium',
+    podiumLeagueTitle:'Classement Final',podiumTournamentTitle:'Tournoi Terminé',
+    shareExploit:'📤 Partager mon exploit',podiumClose:'Fermer',
+    podiumShareFb:'Partager sur Facebook',podiumShareCopy:'Copier le lien',
   },
   en:{
     home:'Home',players:'Players',leagues:'Competitions',ranking:'Ranking',profile:'Profile',
@@ -380,6 +388,10 @@ const T = {
     searchLeague:'Search a league...',searchTournament:'Search a tournament...',
     shareTournament:'Share via WhatsApp',
     phoneInvalid:'Invalid number. Expected format: 050 123 4567.',
+    endLeague:'🏆 End of league',endTournamentBtn:'🏆 View podium',
+    podiumLeagueTitle:'Final Standings',podiumTournamentTitle:'Tournament Over',
+    shareExploit:'📤 Share my achievement',podiumClose:'Close',
+    podiumShareFb:'Share on Facebook',podiumShareCopy:'Copy link',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'תחרויות',ranking:'דירוג',profile:'פרופיל',
@@ -473,6 +485,10 @@ const T = {
     searchLeague:'חפש ליגה...',searchTournament:'חפש טורניר...',
     shareTournament:'שתף בוואטסאפ',
     phoneInvalid:'מספר לא תקין. פורמט צפוי: 050 123 4567.',
+    endLeague:'🏆 סיום הליגה',endTournamentBtn:'🏆 הצג פודיום',
+    podiumLeagueTitle:'דירוג סופי',podiumTournamentTitle:'הטורניר הסתיים',
+    shareExploit:'📤 שתף את ההישג שלי',podiumClose:'סגור',
+    podiumShareFb:'שתף בפייסבוק',podiumShareCopy:'העתק קישור',
   }
 }
 
@@ -2029,6 +2045,7 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
   const myLeaveReqs = leaveRequests.filter(r => r.league_id === league.id)
   const [leaveBusy, setLeaveBusy] = useState(false)
   const [deletingLeague, setDeletingLeague] = useState(false)
+  const [showPodium, setShowPodium] = useState(false)
   const showToast = useToast()
   const confirm = useConfirm()
 
@@ -2072,10 +2089,29 @@ function LeagueView({ t, lang, league, players, me, leagueMatches, selectedTab, 
 
   return (
     <div>
+      {showPodium && (() => {
+        var standings = computeStandings()
+        var top3 = standings.slice(0, 3).map(s => {
+          var tm = (league.teams || []).find(x => x.id === s.id)
+          var p1 = tm ? players.find(p => p.id === tm.player1_id) : null
+          var p2 = tm ? players.find(p => p.id === tm.player2_id) : null
+          var playerNames = [p1?.name, p2?.name].filter(Boolean).join(' & ')
+          return { name: s.name, players: playerNames || null, pts: s.PTS }
+        })
+        return (
+          <PodiumModal t={t} lang={lang}
+            title={league.name + ' — ' + t.podiumLeagueTitle}
+            podium={top3}
+            onClose={() => setShowPodium(false)} />
+        )
+      })()}
       <div className="row" style={{ padding: '14px 16px 4px' }}>
         <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.leagues}</button>
         <span className="fw700 flex1" style={{ fontSize: 14, marginLeft: 8 }}>{league.is_private ? '🔒 ' : '🌍 '}{league.name}</span>
-        {isAdmin && <button className="btn btn-danger btn-sm" disabled={deletingLeague} onClick={handleDeleteLeague}>🗑 {t.deleteLeague}</button>}
+        <div style={{ display:'flex', gap:6 }}>
+          {isAdmin && <button className="btn btn-yellow btn-sm" onClick={() => setShowPodium(true)}>{t.endLeague}</button>}
+          {isAdmin && <button className="btn btn-danger btn-sm" disabled={deletingLeague} onClick={handleDeleteLeague}>🗑</button>}
+        </div>
       </div>
       <div style={{ padding: '0 16px 6px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <span className="text-xs">{t.duration}: {league.match_duration}min</span>
@@ -3362,6 +3398,8 @@ function TournamentView({ t, lang, tournament, league, players, isAdmin, isSubAd
   const bracket = tournament.bracket || {}
   const canEdit = isAdmin || isSubAdmin
   const isFinished = bracket.status === 'finished'
+  const [showPodium, setShowPodium] = useState(false)
+
   function getTeamName(id) {
     if (!id) return ''
     const teams = bracket.teams || []
@@ -3369,11 +3407,36 @@ function TournamentView({ t, lang, tournament, league, players, isAdmin, isSubAd
     return (league?.teams || []).find(tm => tm.id === id)?.name || '?'
   }
 
+  function getTeamPlayers(id) {
+    if (!id) return null
+    const teams = bracket.teams || []
+    var tm = typeof teams[0] === 'object' ? teams.find(x => x.id === id) : null
+    if (!tm) return null
+    var p1 = players.find(p => p.id === tm.player1_id)
+    var p2 = players.find(p => p.id === tm.player2_id)
+    return [p1?.name, p2?.name].filter(Boolean).join(' & ') || null
+  }
+
+  var podium = [
+    bracket.winner ? { name: getTeamName(bracket.winner), players: getTeamPlayers(bracket.winner) } : null,
+    bracket.second ? { name: getTeamName(bracket.second), players: getTeamPlayers(bracket.second) } : null,
+    bracket.third  ? { name: getTeamName(bracket.third),  players: getTeamPlayers(bracket.third)  } : null,
+  ].filter(Boolean)
+
   return (
     <div>
+      {showPodium && (
+        <PodiumModal t={t} lang={lang}
+          title={tournament.name + ' — ' + t.podiumTournamentTitle}
+          podium={podium}
+          onClose={() => setShowPodium(false)} />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 4px' }}>
         <button className="btn btn-outline btn-sm" onClick={onBack}>← {t.tournamentsSection}</button>
-        {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑 {t.deleteTournament}</button>}
+        <div style={{ display:'flex', gap:6 }}>
+          {isFinished && <button className="btn btn-yellow btn-sm" onClick={() => setShowPodium(true)}>{t.endTournamentBtn}</button>}
+          {canEdit && <button className="btn btn-danger btn-sm" onClick={onDelete}>🗑</button>}
+        </div>
       </div>
       <div style={{ padding: '6px 16px 14px' }}>
         <div style={{ fontSize: 18, fontWeight: 700 }}>{tournament.name}</div>
@@ -3385,11 +3448,11 @@ function TournamentView({ t, lang, tournament, league, players, isAdmin, isSubAd
         </div>
       </div>
 
-      {isFinished && (
+      {isFinished && podium.length > 0 && (
         <Podium t={t} lang={lang}
-          winner={bracket.winner ? getTeamName(bracket.winner) : null}
-          second={bracket.second ? getTeamName(bracket.second) : null}
-          third={bracket.third ? getTeamName(bracket.third) : null}
+          winner={podium[0]?.name || null}
+          second={podium[1]?.name || null}
+          third={podium[2]?.name || null}
         />
       )}
 
@@ -3431,6 +3494,120 @@ function Podium({ t, lang, winner, second, third }) {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function PodiumModal({ t, lang, title, podium, onClose }) {
+  var [copied, setCopied] = useState(false)
+  var [confetti] = useState(() => Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    delay: Math.random() * 4,
+    dur: 2.5 + Math.random() * 3,
+    color: ['#f59e0b','#a855f7','#06b6d4','#10b981','#ef4444','#fff','#84cc16'][Math.floor(Math.random() * 7)],
+    size: 5 + Math.floor(Math.random() * 9),
+    round: Math.random() > 0.45,
+  })))
+
+  var first = podium[0], second = podium[1], third = podium[2]
+
+  function buildShareText() {
+    var lines = ['🏆 ' + title + ' — PadelLink 🎾']
+    if (first) lines.push('🥇 ' + first.name + (first.players ? ' (' + first.players + ')' : ''))
+    if (second) lines.push('🥈 ' + second.name + (second.players ? ' (' + second.players + ')' : ''))
+    if (third) lines.push('🥉 ' + third.name + (third.players ? ' (' + third.players + ')' : ''))
+    lines.push(window.location.origin)
+    return lines.join('\n')
+  }
+
+  async function handleShare() {
+    var text = buildShareText()
+    if (navigator.share) {
+      try { await navigator.share({ title: 'PadelLink 🏆', text }) } catch {}
+    } else {
+      var url = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(window.location.origin) + '&quote=' + encodeURIComponent(text)
+      window.open(url, '_blank', 'noopener,noreferrer,width=600,height=450')
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(buildShareText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+
+  var barHeights = [180, 130, 90]
+  var medals = ['🥇', '🥈', '🥉']
+  var barColors = [
+    'linear-gradient(180deg,#f59e0b,#d97706)',
+    'linear-gradient(180deg,#9ca3af,#6b7280)',
+    'linear-gradient(180deg,#b45309,#78350f)',
+  ]
+  var textColors = ['#fbbf24', '#d1d5db', '#d97706']
+  var order = [second, first, third]
+  var orderIdxMap = [1, 0, 2]
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.93)', zIndex:500, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', overflowY:'auto', padding:'20px 16px 40px' }}>
+      {confetti.map(c => (
+        <div key={c.id} style={{ position:'fixed', left:c.left+'%', top:-16, width:c.size, height:c.size,
+          background:c.color, borderRadius:c.round?'50%':'2px', pointerEvents:'none',
+          animation:`confettiFall ${c.dur}s ${c.delay}s linear infinite` }} />
+      ))}
+
+      <div style={{ position:'relative', zIndex:1, width:'100%', maxWidth:400, textAlign:'center' }}>
+        <div style={{ fontSize:56, animation:'trophyBounce 1.4s ease-in-out infinite', display:'inline-block', marginBottom:8 }}>🏆</div>
+        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:26, letterSpacing:2, color:'#f59e0b', marginBottom:2, animation:'podiumFadeUp 0.5s ease both' }}>{title}</div>
+        {first && <div style={{ fontSize:13, color:'#9ca3af', marginBottom:28, animation:'podiumFadeUp 0.5s 0.1s ease both', opacity:0, animationFillMode:'forwards' }}>{first.name}</div>}
+
+        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'center', gap:8, height:220, marginBottom:24 }}>
+          {order.map((entry, col) => {
+            var idx = orderIdxMap[col]
+            if (!entry) return <div key={col} style={{ flex: col===1?1.3:1 }} />
+            return (
+              <div key={col} style={{ flex:col===1?1.3:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+                <div style={{ fontSize:col===1?13:11, fontWeight:700, color:textColors[idx], marginBottom:4, lineHeight:1.3, animation:`podiumFadeUp 0.5s ${0.3+col*0.15}s ease both`, opacity:0, animationFillMode:'forwards' }}>
+                  {entry.name}
+                </div>
+                {entry.players && (
+                  <div style={{ fontSize:9, color:'#6b7280', marginBottom:6, lineHeight:1.4, animation:`podiumFadeUp 0.5s ${0.4+col*0.15}s ease both`, opacity:0, animationFillMode:'forwards' }}>
+                    {entry.players}
+                  </div>
+                )}
+                <div style={{ width:'100%', height:barHeights[idx], background:barColors[idx], borderRadius:'10px 10px 0 0',
+                  display:'flex', flexDirection:'column', alignItems:'center', paddingTop:10, gap:4,
+                  transformOrigin:'bottom', animation:`podiumRise 0.7s ${col*0.2}s cubic-bezier(0.34,1.56,0.64,1) both` }}>
+                  <span style={{ fontSize:col===1?36:26 }}>{medals[idx]}</span>
+                  {entry.pts !== undefined && (
+                    <span style={{ fontFamily:"'Bebas Neue',cursive", fontSize:16, color:'rgba(255,255,255,0.8)' }}>{entry.pts} pts</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:8 }}>
+          <button onClick={handleShare} style={{ padding:'13px 20px', borderRadius:14, border:'none', cursor:'pointer',
+            background:'linear-gradient(135deg,#7c3aed,#06b6d4)', color:'#fff', fontFamily:"'Plus Jakarta Sans',sans-serif",
+            fontWeight:700, fontSize:14 }}>
+            {t.shareExploit}
+          </button>
+          {!navigator.share && (
+            <button onClick={handleCopy} style={{ padding:'11px 20px', borderRadius:14, border:'1px solid rgba(139,92,246,0.4)',
+              background:'transparent', color:'#a855f7', fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:13, cursor:'pointer' }}>
+              {copied ? '✓ Copié !' : t.podiumShareCopy}
+            </button>
+          )}
+          <button onClick={onClose} style={{ padding:'11px 20px', borderRadius:14, border:'1px solid rgba(255,255,255,0.1)',
+            background:'transparent', color:'#6b7280', fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:600, fontSize:13, cursor:'pointer' }}>
+            {t.podiumClose}
+          </button>
+        </div>
       </div>
     </div>
   )
