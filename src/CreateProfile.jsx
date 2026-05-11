@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { supabase } from './supabase'
+import { CITIES } from './cities'
 
 const LEVELS = [
   { val: 1.0, label: 'Débutant', labelEn: 'Beginner', labelHe: 'מתחיל', color: '#6b7280', desc: 'Tu découvres le padel.', descEn: 'You are discovering padel.', descHe: 'אתה מתחיל ללמוד פאדל.' },
@@ -29,7 +30,8 @@ const T = {
     createProfile: '🎾 Créer mon profil',
     creating: '⏳ Création...',
     nameError: 'Entre ton prénom et nom (min. 2 caractères).',
-    cityError: 'Entre ta ville.',
+    selectCity: '-- Sélectionne ta ville --',
+    cityError: 'Sélectionne ta ville.',
     dobError: 'Entre ta date de naissance.',
     invalidDobError: 'Date de naissance invalide.',
     phoneError: 'Numéro invalide. Entre un numéro israélien valide (ex: 050 123 4567).',
@@ -51,7 +53,8 @@ const T = {
     createProfile: '🎾 Create my profile',
     creating: '⏳ Creating...',
     nameError: 'Enter your first and last name (min. 2 characters).',
-    cityError: 'Enter your city.',
+    selectCity: '-- Select your city --',
+    cityError: 'Please select your city.',
     dobError: 'Enter your date of birth.',
     invalidDobError: 'Invalid date of birth.',
     phoneError: 'Invalid number. Enter a valid Israeli number (e.g. 050 123 4567).',
@@ -73,7 +76,8 @@ const T = {
     createProfile: '🎾 צור את הפרופיל שלי',
     creating: '⏳ יוצר...',
     nameError: 'הכנס שם פרטי ושם משפחה (מינ. 2 תווים).',
-    cityError: 'הכנס את העיר שלך.',
+    selectCity: '-- בחר את העיר שלך --',
+    cityError: 'בחר את העיר שלך.',
     dobError: 'הכנס את תאריך הלידה שלך.',
     invalidDobError: 'תאריך לידה לא תקין.',
     phoneError: 'מספר לא תקין. הכנס מספר ישראלי תקין (לדוגמה: 050 123 4567).',
@@ -205,7 +209,10 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
           <input className="input" placeholder="Carlos Reyes" value={name} maxLength={50} onChange={e => setName(e.target.value)} />
 
           <div className="label">{t.city}</div>
-          <input className="input" placeholder="Tel Aviv" value={city} maxLength={50} onChange={e => setCity(e.target.value)} />
+          <select className="select" value={city} onChange={e => setCity(e.target.value)}>
+            <option value="">{t.selectCity}</option>
+            {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
 
           <div className="label">{t.phone}</div>
           <input className="input" type="tel" placeholder="+972 50 000 0000" value={phone} maxLength={20} onChange={e => setPhone(e.target.value)} />

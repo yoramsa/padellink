@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, createContext, useContext } from 'react'
 import { supabase } from './supabase'
+import { CITIES } from './cities'
 
 const STYLES = `
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -250,6 +251,7 @@ const T = {
     saved:'✓ Sauvegardé !',profileUpdated:'✓ Profil mis à jour !',
     matchConfirmed:'✓ Match confirmé !',matchRefused:'Match refusé.',
     leagueJoined:'✓ Ligue rejointe !',leagueLeft:'Demande de sortie envoyée.',
+    selectCity:'-- Sélectionne une ville --',leagueCity:'Ville',
     wrongCode:'Code incorrect.',nameRequired:'Nom trop court (min. 2 car.).',cityRequired:'Ville requise.',
     maxPlayers:'Limite de joueurs',maxPlayersHint:'0 = illimité',leagueFull:'La ligue est complète',
     deleteLeague:'Supprimer la ligue',confirmDeleteLeague:'Supprimer définitivement cette ligue et toutes ses données ?',
@@ -349,6 +351,7 @@ const T = {
     saved:'✓ Saved!',profileUpdated:'✓ Profile updated!',
     matchConfirmed:'✓ Match confirmed!',matchRefused:'Match declined.',
     leagueJoined:'✓ League joined!',leagueLeft:'Leave request sent.',
+    selectCity:'-- Select a city --',leagueCity:'City',
     wrongCode:'Wrong code.',nameRequired:'Name too short (min. 2 chars).',cityRequired:'City required.',
     maxPlayers:'Player limit',maxPlayersHint:'0 = unlimited',leagueFull:'League is full',
     deleteLeague:'Delete league',confirmDeleteLeague:'Permanently delete this league and all its data?',
@@ -448,6 +451,7 @@ const T = {
     saved:'✓ נשמר!',profileUpdated:'✓ פרופיל עודכן!',
     matchConfirmed:'✓ משחק אושר!',matchRefused:'משחק נדחה.',
     leagueJoined:'✓ הצטרפת לליגה!',leagueLeft:'בקשת עזיבה נשלחה.',
+    selectCity:'-- בחר עיר --',leagueCity:'עיר',
     wrongCode:'קוד שגוי.',nameRequired:'שם קצר מדי (מינ. 2 תווים).',cityRequired:'עיר נדרשת.',
     maxPlayers:'מגבלת שחקנים',maxPlayersHint:'0 = ללא הגבלה',leagueFull:'הליגה מלאה',
     deleteLeague:'מחק ליגה',confirmDeleteLeague:'למחוק לצמיתות את הליגה וכל הנתונים שלה?',
@@ -1965,7 +1969,7 @@ function LeaguePreview({ t, lang, league, players, me, joinLeague, setViewLeague
 
 // ══ CREATE LEAGUE MODAL ══
 function CreateLeagueModal({ t, lang, onCreate, onClose }) {
-  const [form, setForm] = useState({ name: '', season: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, maxPlayers: 0, isPrivate: false, code: '' })
+  const [form, setForm] = useState({ name: '', season: '', city: '', rules: '', setsPerMatch: 3, matchDuration: 90, minAge: 16, maxPlayers: 0, isPrivate: false, code: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const set = (k, v) => { setFormError(''); setForm(p => ({ ...p, [k]: v })) }
@@ -1976,7 +1980,7 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
   }
 
   async function handleCreate() {
-    if (!form.name.trim() || !form.season.trim()) {
+    if (!form.name.trim() || !form.season.trim() || !form.city) {
       setFormError(t.leagueFormError)
       return
     }
@@ -1991,6 +1995,10 @@ function CreateLeagueModal({ t, lang, onCreate, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input className="input" placeholder={t.leagueName + ' *'} maxLength={50} value={form.name} onChange={e => set('name', e.target.value)} />
           <input className="input" placeholder={t.season + ' *'} maxLength={50} value={form.season} onChange={e => set('season', e.target.value)} />
+          <select className="select" value={form.city} onChange={e => set('city', e.target.value)}>
+            <option value="">{t.leagueCity} *</option>
+            {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
           <textarea className="input" placeholder={t.rules} value={form.rules} rows={3} maxLength={500} onChange={e => set('rules', e.target.value)} style={{ resize: 'none' }} />
           <div className="row gap8">
             <div style={{ flex: 1 }}>
@@ -2784,6 +2792,7 @@ function TournamentListTab({ t, lang, me, players, tournaments, loadTournaments,
 
 function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
   const [name, setName] = useState('')
+  const [city, setCity] = useState('')
   const [type, setType] = useState('elimination')
   const [hasThirdPlace, setHasThirdPlace] = useState(true)
   const [isPrivate, setIsPrivate] = useState(false)
@@ -2795,6 +2804,7 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
 
   async function handleCreate() {
     if (!name.trim() || name.trim().length < 2) { setErr(t.nameRequired); return }
+    if (!city) { setErr(t.cityRequired); return }
     const max = parseInt(maxTeams) || 0
     if (max > 0 && max < 4) { setErr(t.maxTeamsError); return }
     setSaving(true); setErr(null)
@@ -2813,7 +2823,7 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
       winner: null, second: null, third: null,
       third_place_match: hasThirdPlace ? { id: '3rd', t1: null, t2: null, sets: [], winner: null } : null
     }
-    const { error } = await supabase.from('tournaments').insert({ league_id: null, name: sanitize(name).slice(0, 60), type, bracket })
+    const { error } = await supabase.from('tournaments').insert({ league_id: null, name: sanitize(name).slice(0, 60), city, type, bracket })
     setSaving(false)
     if (error) { setErr(error.message); return }
     reload()
@@ -2830,6 +2840,12 @@ function CreateTournamentFormModal({ t, lang, me, onClose, reload }) {
         <input className="input mb12" value={name} maxLength={60}
           onChange={e => setName(e.target.value)}
           placeholder={lang === 'fr' ? 'Coupe de Tel Aviv' : lang === 'he' ? 'גביע תל אביב' : 'Tel Aviv Cup'} />
+
+        <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t.leagueCity}</div>
+        <select className="select mb12" value={city} onChange={e => setCity(e.target.value)}>
+          <option value="">{t.selectCity}</option>
+          {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
 
         <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t.tournamentType}</div>
         <div className="row gap8 mb12">
@@ -4246,7 +4262,10 @@ function ProfileTab({ t, lang, me, players, myRatings, myBadges, myMatches, leag
           ) : (
             <div className="col flex1" style={{ gap: 6 }}>
               <input className="input" value={eName} maxLength={50} onChange={e => setEName(e.target.value)} />
-              <input className="input" value={eCity} maxLength={50} onChange={e => setECity(e.target.value)} />
+              <select className="select" value={eCity} onChange={e => setECity(e.target.value)}>
+                <option value="">{t.selectCity}</option>
+                {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
               <div style={{ fontSize: 11, color: '#6b7280', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{t.phone}</div>
               <input className="input mb12" type="tel" value={editPhone} maxLength={20} onChange={e => setEditPhone(e.target.value)} placeholder="05X XXX XXXX" />
               <select className="select" value={eLevel} onChange={e => setELevel(parseFloat(e.target.value))}>
