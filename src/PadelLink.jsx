@@ -295,6 +295,8 @@ const T = {
     podiumLeagueTitle:'Classement Final',podiumTournamentTitle:'Tournoi Terminé',
     shareExploit:'📤 Partager mon exploit',podiumClose:'Fermer',
     podiumShareFb:'Partager sur Facebook',podiumShareCopy:'Copier le lien',
+    installApp:'📲 Télécharger l\'appli',
+    installIos:'Sur iPhone : appuie sur Partager → "Sur l\'écran d\'accueil"',
   },
   en:{
     home:'Home',players:'Players',leagues:'Competitions',ranking:'Ranking',profile:'Profile',
@@ -392,6 +394,8 @@ const T = {
     podiumLeagueTitle:'Final Standings',podiumTournamentTitle:'Tournament Over',
     shareExploit:'📤 Share my achievement',podiumClose:'Close',
     podiumShareFb:'Share on Facebook',podiumShareCopy:'Copy link',
+    installApp:'📲 Install app',
+    installIos:'On iPhone: tap Share → "Add to Home Screen"',
   },
   he:{
     home:'בית',players:'שחקנים',leagues:'תחרויות',ranking:'דירוג',profile:'פרופיל',
@@ -489,6 +493,8 @@ const T = {
     podiumLeagueTitle:'דירוג סופי',podiumTournamentTitle:'הטורניר הסתיים',
     shareExploit:'📤 שתף את ההישג שלי',podiumClose:'סגור',
     podiumShareFb:'שתף בפייסבוק',podiumShareCopy:'העתק קישור',
+    installApp:'📲 הורד את האפליקציה',
+    installIos:'באייפון: לחץ שתף → "הוסף למסך הבית"',
   }
 }
 
@@ -1233,7 +1239,24 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
   const [respondingId, setRespondingId] = useState(null)
   const [resolvingId, setResolvingId] = useState(null)
   const [showAllMatches, setShowAllMatches] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState(null)
+  const [showInstallBtn, setShowInstallBtn] = useState(false)
   const showToast = useToast()
+  const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+
+  useEffect(() => {
+    const handler = e => { e.preventDefault(); setInstallPrompt(e); setShowInstallBtn(true) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstall() {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') setShowInstallBtn(false)
+  }
 
   async function handleRespond(matchId, accepted) {
     if (respondingId) return
@@ -1258,6 +1281,22 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
   return (
     <div>
       <div className="section-title">👋 {me.name.split(' ')[0]}</div>
+
+      {!isStandalone && showInstallBtn && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <button onClick={handleInstall} style={{
+            width: '100%', padding: '12px 16px', borderRadius: 12, border: 'none',
+            cursor: 'pointer', fontFamily: 'Plus Jakarta Sans,sans-serif', fontWeight: 700,
+            fontSize: 14, background: 'linear-gradient(135deg,#7c3aed,#06b6d4)', color: '#fff',
+            boxShadow: '0 4px 14px rgba(124,58,237,0.4)'
+          }}>{t.installApp}</button>
+        </div>
+      )}
+      {!isStandalone && !showInstallBtn && isIos && (
+        <div style={{ margin: '0 16px 12px', padding: '10px 14px', borderRadius: 12, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', fontSize: 12, color: '#a78bfa', textAlign: 'center' }}>
+          {t.installIos}
+        </div>
+      )}
 
       {myLeaveReqs.length > 0 && (
         <div>
