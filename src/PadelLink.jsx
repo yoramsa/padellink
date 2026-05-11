@@ -1239,27 +1239,7 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
   const [respondingId, setRespondingId] = useState(null)
   const [resolvingId, setResolvingId] = useState(null)
   const [showAllMatches, setShowAllMatches] = useState(false)
-  const [installPrompt, setInstallPrompt] = useState(null)
-  const [showInstallBtn, setShowInstallBtn] = useState(false)
   const showToast = useToast()
-  const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-
-  useEffect(() => {
-    const handler = e => { e.preventDefault(); setInstallPrompt(e); setShowInstallBtn(true) }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  async function handleInstall() {
-    if (!installPrompt) {
-      showToast('Ouvre le menu de ton navigateur → "Ajouter à l\'écran d\'accueil"', 'info')
-      return
-    }
-    installPrompt.prompt()
-    const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') setInstallPrompt(null)
-  }
 
   async function handleRespond(matchId, accepted) {
     if (respondingId) return
@@ -1285,22 +1265,6 @@ function HomeTab({ t, lang, me, players, followedPlayers, pendingForMe, myMatche
     <div>
       <div className="section-title">👋 {me.name.split(' ')[0]}</div>
 
-      {!isStandalone && (
-        isIos ? (
-          <div style={{ margin: '0 16px 12px', padding: '10px 14px', borderRadius: 12, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.3)', fontSize: 12, color: '#a78bfa', textAlign: 'center' }}>
-            {t.installIos}
-          </div>
-        ) : (
-          <div style={{ padding: '0 16px 12px' }}>
-            <button onClick={handleInstall} style={{
-              width: '100%', padding: '12px 16px', borderRadius: 12, border: 'none',
-              cursor: 'pointer', fontFamily: 'Plus Jakarta Sans,sans-serif', fontWeight: 700,
-              fontSize: 14, background: 'linear-gradient(135deg,#7c3aed,#06b6d4)', color: '#fff',
-              boxShadow: '0 4px 14px rgba(124,58,237,0.4)'
-            }}>{t.installApp}</button>
-          </div>
-        )
-      )}
 
       {myLeaveReqs.length > 0 && (
         <div>
