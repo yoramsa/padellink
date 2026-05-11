@@ -196,7 +196,7 @@ const BADGE_DEFS = [
 
 const T = {
   fr:{
-    home:'Accueil',players:'Joueurs',leagues:'Ligues',ranking:'Classement',profile:'Profil',
+    home:'Accueil',players:'Joueurs',leagues:'Compétitions',ranking:'Classement',profile:'Profil',
     follow:'Suivre',unfollow:'Ne plus suivre',rate:'Noter',
     matchPending:'Match en attente',confirm:'Confirmer',refuse:'Refuser',
     createMatch:'Créer un match',myMatches:'Historique des matchs',
@@ -289,7 +289,7 @@ const T = {
     phoneInvalid:'Numéro invalide. Format attendu : 050 123 4567.',
   },
   en:{
-    home:'Home',players:'Players',leagues:'Leagues',ranking:'Ranking',profile:'Profile',
+    home:'Home',players:'Players',leagues:'Competitions',ranking:'Ranking',profile:'Profile',
     follow:'Follow',unfollow:'Unfollow',rate:'Rate',
     matchPending:'Match pending',confirm:'Confirm',refuse:'Decline',
     createMatch:'Create match',myMatches:'Match history',
@@ -382,7 +382,7 @@ const T = {
     phoneInvalid:'Invalid number. Expected format: 050 123 4567.',
   },
   he:{
-    home:'בית',players:'שחקנים',leagues:'ליגות',ranking:'דירוג',profile:'פרופיל',
+    home:'בית',players:'שחקנים',leagues:'תחרויות',ranking:'דירוג',profile:'פרופיל',
     follow:'עקוב',unfollow:'הפסק לעקוב',rate:'דרג',
     matchPending:'משחק ממתין',confirm:'אשר',refuse:'דחה',
     createMatch:'צור משחק',myMatches:'היסטוריית משחקים',
@@ -1583,12 +1583,6 @@ function PlayersTab({ t, lang, me, players, follows, ratings, loadPlayers, toggl
                     {busy ? <Spin /> : (isF ? t.unfollow : t.follow)}
                   </button>
                   <button className="btn btn-sm btn-outline" onClick={() => setRatingModal(p)}>⭐ {t.rate}</button>
-                  {p.phone && p.id !== me.id && (
-                    <a href={whatsappLink(p.phone)} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, background: 'rgba(37,211,102,0.15)', border: '1px solid rgba(37,211,102,0.35)', color: '#25d366', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-                      💬 {t.whatsapp}
-                    </a>
-                  )}
                 </div>
               )}
             </div>
