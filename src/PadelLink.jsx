@@ -4041,7 +4041,7 @@ function LeagueChatTab({ t, league, players, me, sendChatMsg }) {
 function RankingTab({ t, lang, players, follows, ratings, rankTab, setRankTab, setViewPlayerId, setTab, me }) {
   const sorted = [...players].sort((a, b) => b.points - a.points)
   const followedIds = follows.filter(f => f.follower_id === me.id).map(f => f.following_id)
-  const followedSorted = [...players].filter(p => followedIds.includes(p.id)).sort((a, b) => b.points - a.points)
+  const followedSorted = [...players].filter(p => followedIds.includes(p.id) || p.id === me.id).sort((a, b) => b.points - a.points)
 
   function formColor(h) {
     if (!h?.length) return '#6b7280'
