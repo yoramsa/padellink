@@ -3500,56 +3500,48 @@ function Podium({ t, lang, winner, second, third }) {
 }
 
 function PodiumModal({ t, lang, title, podium, onClose }) {
-  var [copied, setCopied] = useState(false)
+  var captureRef = useRef(null)
+  var [sharing, setSharing] = useState(false)
   var [confetti] = useState(() => Array.from({ length: 50 }, (_, i) => ({
-    id: i,
-    left: Math.random() * 100,
-    delay: Math.random() * 4,
-    dur: 2.5 + Math.random() * 3,
+    id: i, left: Math.random() * 100, delay: Math.random() * 4, dur: 2.5 + Math.random() * 3,
     color: ['#f59e0b','#a855f7','#06b6d4','#10b981','#ef4444','#fff','#84cc16'][Math.floor(Math.random() * 7)],
-    size: 5 + Math.floor(Math.random() * 9),
-    round: Math.random() > 0.45,
+    size: 5 + Math.floor(Math.random() * 9), round: Math.random() > 0.45,
   })))
 
   var first = podium[0], second = podium[1], third = podium[2]
 
-  function buildShareText() {
-    var lines = ['🏆 ' + title + ' — PadelLink 🎾']
-    if (first) lines.push('🥇 ' + first.name + (first.players ? ' (' + first.players + ')' : ''))
-    if (second) lines.push('🥈 ' + second.name + (second.players ? ' (' + second.players + ')' : ''))
-    if (third) lines.push('🥉 ' + third.name + (third.players ? ' (' + third.players + ')' : ''))
-    lines.push(window.location.origin)
-    return lines.join('\n')
-  }
-
   async function handleShare() {
-    var text = buildShareText()
-    if (navigator.share) {
-      try { await navigator.share({ title: 'PadelLink 🏆', text }) } catch {}
-    } else {
-      var url = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(window.location.origin) + '&quote=' + encodeURIComponent(text)
-      window.open(url, '_blank', 'noopener,noreferrer,width=600,height=450')
-    }
-  }
-
-  async function handleCopy() {
+    if (sharing) return
+    setSharing(true)
     try {
-      await navigator.clipboard.writeText(buildShareText())
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {}
+      var { default: html2canvas } = await import('html2canvas')
+      var canvas = await html2canvas(captureRef.current, {
+        backgroundColor: '#0e0e16', scale: 2, useCORS: true, allowTaint: true, logging: false,
+      })
+      canvas.toBlob(async blob => {
+        var file = new File([blob], 'padellink-podium.png', { type: 'image/png' })
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try { await navigator.share({ files: [file], title: 'PadelLink 🏆' }) } catch {}
+        } else {
+          var a = document.createElement('a')
+          a.href = URL.createObjectURL(blob)
+          a.download = 'padellink-podium.png'
+          a.click()
+          URL.revokeObjectURL(a.href)
+        }
+        setSharing(false)
+      }, 'image/png')
+    } catch { setSharing(false) }
   }
 
-  var barHeights = [180, 130, 90]
-  var medals = ['🥇', '🥈', '🥉']
-  var barColors = [
-    'linear-gradient(180deg,#f59e0b,#d97706)',
-    'linear-gradient(180deg,#9ca3af,#6b7280)',
-    'linear-gradient(180deg,#b45309,#78350f)',
-  ]
-  var textColors = ['#fbbf24', '#d1d5db', '#d97706']
+  var barH = [170, 120, 80]
+  var medals = ['🥇','🥈','🥉']
+  var barBg = ['linear-gradient(180deg,#f59e0b,#d97706)','linear-gradient(180deg,#9ca3af,#6b7280)','linear-gradient(180deg,#b45309,#78350f)']
+  var txtCol = ['#fbbf24','#e5e7eb','#fcd34d']
   var order = [second, first, third]
-  var orderIdxMap = [1, 0, 2]
+  var oIdx = [1, 0, 2]
+
+  var S = { fontFamily: 'Arial,Helvetica,sans-serif' }
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.93)', zIndex:500, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', overflowY:'auto', padding:'20px 16px 40px' }}>
@@ -3559,26 +3551,66 @@ function PodiumModal({ t, lang, title, podium, onClose }) {
           animation:`confettiFall ${c.dur}s ${c.delay}s linear infinite` }} />
       ))}
 
+      {/* ── Carte capturée (hors-écran) ── */}
+      <div ref={captureRef} style={{ position:'absolute', left:'-2000px', top:0, width:380,
+        background:'linear-gradient(160deg,#0e0e16 0%,#1a0a2e 100%)',
+        padding:'36px 24px 32px', textAlign:'center', ...S }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'#6b7280', letterSpacing:4, textTransform:'uppercase', marginBottom:2, ...S }}>PADELLINK 🎾</div>
+        <div style={{ fontSize:52, marginBottom:10 }}>🏆</div>
+        <div style={{ fontSize:16, fontWeight:700, color:'#f59e0b', letterSpacing:1, marginBottom:32, lineHeight:1.4, ...S }}>{title}</div>
+
+        <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'center', gap:8, height:210, marginBottom:16 }}>
+          {order.map((entry, col) => {
+            var idx = oIdx[col]
+            if (!entry) return <div key={col} style={{ flex:col===1?1.3:1 }} />
+            return (
+              <div key={col} style={{ flex:col===1?1.3:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
+                <div style={{ fontSize:col===1?14:11, fontWeight:700, color:txtCol[idx], marginBottom:4, lineHeight:1.3, ...S }}>{entry.name}</div>
+                {entry.players && <div style={{ fontSize:9, color:'#9ca3af', marginBottom:6, lineHeight:1.4, ...S }}>{entry.players}</div>}
+                <div style={{ width:'100%', height:barH[idx], background:barBg[idx], borderRadius:'10px 10px 0 0',
+                  display:'flex', flexDirection:'column', alignItems:'center', paddingTop:10, gap:4 }}>
+                  <span style={{ fontSize:col===1?36:26 }}>{medals[idx]}</span>
+                  {entry.pts !== undefined && <span style={{ fontSize:14, fontWeight:700, color:'rgba(255,255,255,0.85)', ...S }}>{entry.pts} pts</span>}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display:'flex', justifyContent:'center', gap:16, flexWrap:'wrap' }}>
+          {podium.map((e, i) => e ? (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <span style={{ fontSize:14 }}>{medals[i]}</span>
+              <span style={{ fontSize:10, color:'#9ca3af', ...S }}>{e.name}</span>
+            </div>
+          ) : null)}
+        </div>
+        <div style={{ fontSize:10, color:'#374151', marginTop:20, ...S }}>{window.location.hostname}</div>
+      </div>
+
+      {/* ── Affichage animé (visible) ── */}
       <div style={{ position:'relative', zIndex:1, width:'100%', maxWidth:400, textAlign:'center' }}>
         <div style={{ fontSize:56, animation:'trophyBounce 1.4s ease-in-out infinite', display:'inline-block', marginBottom:8 }}>🏆</div>
-        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:26, letterSpacing:2, color:'#f59e0b', marginBottom:2, animation:'podiumFadeUp 0.5s ease both' }}>{title}</div>
-        {first && <div style={{ fontSize:13, color:'#9ca3af', marginBottom:28, animation:'podiumFadeUp 0.5s 0.1s ease both', opacity:0, animationFillMode:'forwards' }}>{first.name}</div>}
+        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:26, letterSpacing:2, color:'#f59e0b', marginBottom:2 }}>{title}</div>
+        {first && <div style={{ fontSize:13, color:'#9ca3af', marginBottom:28 }}>{first.name}</div>}
 
         <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'center', gap:8, height:220, marginBottom:24 }}>
           {order.map((entry, col) => {
-            var idx = orderIdxMap[col]
-            if (!entry) return <div key={col} style={{ flex: col===1?1.3:1 }} />
+            var idx = oIdx[col]
+            if (!entry) return <div key={col} style={{ flex:col===1?1.3:1 }} />
             return (
               <div key={col} style={{ flex:col===1?1.3:1, display:'flex', flexDirection:'column', alignItems:'center' }}>
-                <div style={{ fontSize:col===1?13:11, fontWeight:700, color:textColors[idx], marginBottom:4, lineHeight:1.3, animation:`podiumFadeUp 0.5s ${0.3+col*0.15}s ease both`, opacity:0, animationFillMode:'forwards' }}>
+                <div style={{ fontSize:col===1?13:11, fontWeight:700, color:txtCol[idx], marginBottom:4, lineHeight:1.3,
+                  animation:`podiumFadeUp 0.5s ${0.3+col*0.15}s ease both`, opacity:0, animationFillMode:'forwards' }}>
                   {entry.name}
                 </div>
                 {entry.players && (
-                  <div style={{ fontSize:9, color:'#6b7280', marginBottom:6, lineHeight:1.4, animation:`podiumFadeUp 0.5s ${0.4+col*0.15}s ease both`, opacity:0, animationFillMode:'forwards' }}>
+                  <div style={{ fontSize:9, color:'#6b7280', marginBottom:6, lineHeight:1.4,
+                    animation:`podiumFadeUp 0.5s ${0.4+col*0.15}s ease both`, opacity:0, animationFillMode:'forwards' }}>
                     {entry.players}
                   </div>
                 )}
-                <div style={{ width:'100%', height:barHeights[idx], background:barColors[idx], borderRadius:'10px 10px 0 0',
+                <div style={{ width:'100%', height:barH[idx], background:barBg[idx], borderRadius:'10px 10px 0 0',
                   display:'flex', flexDirection:'column', alignItems:'center', paddingTop:10, gap:4,
                   transformOrigin:'bottom', animation:`podiumRise 0.7s ${col*0.2}s cubic-bezier(0.34,1.56,0.64,1) both` }}>
                   <span style={{ fontSize:col===1?36:26 }}>{medals[idx]}</span>
@@ -3591,20 +3623,17 @@ function PodiumModal({ t, lang, title, podium, onClose }) {
           })}
         </div>
 
-        <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:8 }}>
-          <button onClick={handleShare} style={{ padding:'13px 20px', borderRadius:14, border:'none', cursor:'pointer',
-            background:'linear-gradient(135deg,#7c3aed,#06b6d4)', color:'#fff', fontFamily:"'Plus Jakarta Sans',sans-serif",
-            fontWeight:700, fontSize:14 }}>
-            {t.shareExploit}
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <button onClick={handleShare} disabled={sharing}
+            style={{ padding:'13px 20px', borderRadius:14, border:'none', cursor:'pointer',
+              background:'linear-gradient(135deg,#7c3aed,#06b6d4)', color:'#fff',
+              fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:14,
+              opacity: sharing ? 0.7 : 1 }}>
+            {sharing ? '⏳ ' + (lang==='fr'?'Préparation...':lang==='he'?'מכין...':'Preparing...') : t.shareExploit}
           </button>
-          {!navigator.share && (
-            <button onClick={handleCopy} style={{ padding:'11px 20px', borderRadius:14, border:'1px solid rgba(139,92,246,0.4)',
-              background:'transparent', color:'#a855f7', fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:700, fontSize:13, cursor:'pointer' }}>
-              {copied ? '✓ Copié !' : t.podiumShareCopy}
-            </button>
-          )}
           <button onClick={onClose} style={{ padding:'11px 20px', borderRadius:14, border:'1px solid rgba(255,255,255,0.1)',
-            background:'transparent', color:'#6b7280', fontFamily:"'Plus Jakarta Sans',sans-serif", fontWeight:600, fontSize:13, cursor:'pointer' }}>
+            background:'transparent', color:'#6b7280', fontFamily:"'Plus Jakarta Sans',sans-serif",
+            fontWeight:600, fontSize:13, cursor:'pointer' }}>
             {t.podiumClose}
           </button>
         </div>
