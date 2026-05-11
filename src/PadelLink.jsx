@@ -707,11 +707,6 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
 
   useEffect(() => { loadAll() }, [])
 
-  useEffect(() => {
-    if (tab === 'players') loadPlayers('', 0)
-    if (tab === 'leagues') loadLeagues(0)
-    if (tab === 'ranking') loadPlayers('', 0)
-  }, [tab])
 
   // Handle league invitation URL
   useEffect(() => {
@@ -735,9 +730,22 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
   // Phase 2: players + leagues (background)
   async function loadAll() {
     setLoadingData(true)
-    await Promise.all([loadFollows(), loadFreeMatches(), loadLeaveRequests()])
+    // Phase 1: minimum for HomeTab — parallel
+    const [,, { data: memberships }] = await Promise.all([
+      loadFollows(),
+      loadFreeMatches(),
+      supabase.from('league_members').select('league_id,player_id,role').eq('player_id', me.id)
+    ])
+    const myLeagueIds = (memberships || []).map(m => m.league_id)
     setLoadingData(false)
-    await Promise.all([loadPlayers('', 0), loadLeagues(0), loadRatings(), loadLeagueMatches()])
+    // Phase 2: background — all parallel, memberships reused (no duplicate query)
+    await Promise.all([
+      loadLeaveRequests(),
+      loadPlayers('', 0),
+      loadLeagues(0, myLeagueIds),
+      loadRatings(),
+      loadLeagueMatches(myLeagueIds)
+    ])
     setLoadingBg(false)
   }
 
@@ -769,59 +777,68 @@ export default function PadelLink({ session, player: initialPlayer, pendingLeagu
     if (data) setRatings(data)
   }
 
-  async function loadLeagues(page = 0) {
-    const from = page * 20, to = from + 19
-    const { data: myMemberships } = await supabase.from('league_members').select('league_id,player_id,role').eq('player_id', me.id)
-    const myLeagueIds = (myMemberships || []).map(m => m.league_id)
-    let loaded = []
-    if (myLeagueIds.length > 0) {
-      const { data: mine } = await supabase.from('leagues').select('*').in('id', myLeagueIds).order('created_at', { ascending: false })
-      loaded = loaded.concat(mine || [])
+  async function loadLeagues(page = 0, myLeagueIds = null) {
+    if (myLeagueIds === null) {
+      const { data: m } = await supabase.from('league_members').select('league_id').eq('player_id', me.id)
+      myLeagueIds = (m || []).map(x => x.league_id)
     }
-    let publicQuery = supabase.from('leagues').select('*').eq('is_private', false).order('created_at', { ascending: false }).range(from, to)
-    if (myLeagueIds.length > 0) publicQuery = publicQuery.not('id', 'in', '(' + myLeagueIds.join(',') + ')')
-    const { data: publicLeagues } = await publicQuery
-    loaded = loaded.concat(publicLeagues || [])
-    const unique = []
-    loaded.forEach(l => { if (!unique.some(x => x.id === l.id)) unique.push(l) })
+    const from = page * 20, to = from + 19
+    // Parallel: my leagues + public leagues
+    const queries = [
+      supabase.from('leagues').select('*').eq('is_private', false).order('created_at', { ascending: false }).range(from, to)
+    ]
+    if (myLeagueIds.length > 0) {
+      queries.push(supabase.from('leagues').select('*').in('id', myLeagueIds).order('created_at', { ascending: false }))
+    }
+    const results = await Promise.all(queries)
+    const publicLeagues = results[0].data || []
+    const myLeagues = results[1]?.data || []
+    const unique = [...myLeagues]
+    publicLeagues.forEach(l => { if (!unique.some(x => x.id === l.id)) unique.push(l) })
     const leagueIds = unique.map(l => l.id)
     if (!leagueIds.length) { setLeagues([]); return }
-    const { data: members } = await supabase.from('league_members').select('league_id,player_id,role').in('league_id', leagueIds)
-    const { data: teams } = await supabase.from('teams').select('*').in('league_id', leagueIds)
+    // Parallel: members + teams + tournaments
+    const [{ data: members }, { data: teams }] = await Promise.all([
+      supabase.from('league_members').select('league_id,player_id,role').in('league_id', leagueIds),
+      supabase.from('teams').select('*').in('league_id', leagueIds),
+      loadTournaments(leagueIds)
+    ])
     const withDetails = unique.map(l => ({
       ...l,
       league_members: (members || []).filter(m => m.league_id === l.id),
       teams: (teams || []).filter(tm => tm.league_id === l.id)
     }))
-    await loadPlayersByIds([
+    loadPlayersByIds([
       ...unique.map(l => l.admin_id),
       ...(members || []).map(m => m.player_id),
       ...(teams || []).flatMap(tm => [tm.player1_id, tm.player2_id])
     ])
     setLeagues(prev => page === 0 ? withDetails : [...prev, ...withDetails.filter(l => !prev.some(x => x.id === l.id))])
-    if (leagueIds.length) await loadTournaments(leagueIds)
   }
 
   async function loadFreeMatches() {
     const { data } = await supabase.from('free_matches').select('*')
       .or(`creator_id.eq.${me.id},player1_id.eq.${me.id},player2_id.eq.${me.id},player3_id.eq.${me.id},player4_id.eq.${me.id}`)
       .order('created_at', { ascending: false }).limit(50)
-    if (data) {
-      setFreeMatches(data)
-      await loadPlayersByIds(data.flatMap(m => [m.creator_id, m.player1_id, m.player2_id, m.player3_id, m.player4_id]))
-      const matchIds = data.map(m => m.id)
-      if (matchIds.length) {
-        const { data: confs } = await supabase.from('free_match_confirmations').select('*').in('match_id', matchIds)
-        if (confs) setMatchConfirmations(confs)
-      }
-    }
+    if (!data) return
+    setFreeMatches(data)
+    const matchIds = data.map(m => m.id)
+    // Parallel: load players + confirmations
+    await Promise.all([
+      loadPlayersByIds(data.flatMap(m => [m.creator_id, m.player1_id, m.player2_id, m.player3_id, m.player4_id])),
+      matchIds.length
+        ? supabase.from('free_match_confirmations').select('*').in('match_id', matchIds).then(({ data: confs }) => { if (confs) setMatchConfirmations(confs) })
+        : Promise.resolve()
+    ])
   }
 
-  async function loadLeagueMatches() {
-    const { data: myMemberships } = await supabase.from('league_members').select('league_id').eq('player_id', me.id)
-    const ids = (myMemberships || []).map(m => m.league_id)
-    if (!ids.length) { setLeagueMatches([]); return }
-    const { data } = await supabase.from('matches').select('*').in('league_id', ids).order('created_at', { ascending: false }).limit(50)
+  async function loadLeagueMatches(myLeagueIds = []) {
+    if (!myLeagueIds.length) {
+      const { data: m } = await supabase.from('league_members').select('league_id').eq('player_id', me.id)
+      myLeagueIds = (m || []).map(x => x.league_id)
+    }
+    if (!myLeagueIds.length) { setLeagueMatches([]); return }
+    const { data } = await supabase.from('matches').select('*').in('league_id', myLeagueIds).order('created_at', { ascending: false }).limit(50)
     if (data) setLeagueMatches(data)
   }
 
