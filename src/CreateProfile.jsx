@@ -36,7 +36,12 @@ const T = {
     invalidDobError: 'Date de naissance invalide.',
     phoneError: 'Numéro invalide. Entre un numéro israélien valide (ex: 050 123 4567).',
     phoneDuplicateError: 'Ce numéro est déjà utilisé. Si c\'est une erreur, contacte padellink-support@gmail.com',
-    error: 'Erreur : '
+    error: 'Erreur : ',
+    checkName: 'Prénom et nom (min. 2 caractères)',
+    checkCity: 'Ville sélectionnée',
+    checkDob: 'Date de naissance complète',
+    checkAge: 'Âge minimum : 10 ans',
+    checkPhone: 'Numéro de téléphone valide'
   },
   en: {
     subtitle: 'CREATE YOUR PLAYER PROFILE',
@@ -59,7 +64,12 @@ const T = {
     invalidDobError: 'Invalid date of birth.',
     phoneError: 'Invalid number. Enter a valid Israeli number (e.g. 050 123 4567).',
     phoneDuplicateError: 'This number is already in use. If this is a mistake, contact padellink-support@gmail.com',
-    error: 'Error: '
+    error: 'Error: ',
+    checkName: 'First and last name (min. 2 characters)',
+    checkCity: 'City selected',
+    checkDob: 'Complete date of birth',
+    checkAge: 'Minimum age: 10 years',
+    checkPhone: 'Valid phone number'
   },
   he: {
     subtitle: 'צור את פרופיל השחקן שלך',
@@ -82,7 +92,12 @@ const T = {
     invalidDobError: 'תאריך לידה לא תקין.',
     phoneError: 'מספר לא תקין. הכנס מספר ישראלי תקין (לדוגמה: 050 123 4567).',
     phoneDuplicateError: 'מספר זה כבר בשימוש. אם זו טעות, צור קשר עם padellink-support@gmail.com',
-    error: 'שגיאה: '
+    error: 'שגיאה: ',
+    checkName: 'שם פרטי ושם משפחה (מינ. 2 תווים)',
+    checkCity: 'עיר נבחרה',
+    checkDob: 'תאריך לידה מלא',
+    checkAge: 'גיל מינימלי: 10 שנים',
+    checkPhone: 'מספר טלפון תקין'
   }
 }
 
@@ -267,7 +282,31 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
             </div>
           </div>
 
-          <button className="btn" disabled={loading || !name || !city || !dob || currentAge < 10 || !phone} onClick={handleSubmit}>
+          {(() => {
+            const digits = phone.replace(/[\s\-().]/g, '').replace(/^(\+972|972)/, '0')
+            const validPhone = /^0(5[0-9]|[234789]\d)\d{7}$/.test(digits)
+            const checks = [
+              { label: t.checkName, ok: name.trim().length >= 2 },
+              { label: t.checkCity, ok: city.trim().length >= 2 },
+              { label: t.checkDob, ok: !!dob },
+              { label: t.checkAge, ok: currentAge !== null && currentAge >= 10 && currentAge <= 100 },
+              { label: t.checkPhone, ok: validPhone }
+            ]
+            const allOk = checks.every(c => c.ok)
+            if (allOk) return null
+            return (
+              <div style={{marginBottom:14,padding:'10px 14px',borderRadius:10,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)'}}>
+                {checks.map((c,i) => (
+                  <div key={i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,marginBottom:i<checks.length-1?6:0,color:c.ok?'#10b981':'#6b7280'}}>
+                    <span style={{fontSize:14}}>{c.ok?'✓':'○'}</span>
+                    <span>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          <button className="btn" disabled={loading} onClick={handleSubmit}>
             {loading ? t.creating : t.createProfile}
           </button>
 
