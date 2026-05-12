@@ -121,7 +121,12 @@ const STYLES = `
 export default function CreateProfile({ session, onCreated, lang, setLang }) {
   const [name, setName] = useState(session.user.user_metadata?.name || '')
   const [city, setCity] = useState('')
-  const [dob, setDob] = useState('')
+  const [dobDay, setDobDay] = useState('')
+  const [dobMonth, setDobMonth] = useState('')
+  const [dobYear, setDobYear] = useState('')
+  const dob = (dobYear.length === 4 && dobMonth && dobDay)
+    ? `${dobYear}-${dobMonth.padStart(2,'0')}-${dobDay.padStart(2,'0')}`
+    : ''
   const [phone, setPhone] = useState('')
   const [level, setLevel] = useState(2.0)
   const [loading, setLoading] = useState(false)
@@ -218,7 +223,16 @@ export default function CreateProfile({ session, onCreated, lang, setLang }) {
           <input className="input" type="tel" placeholder="+972 50 000 0000" value={phone} maxLength={20} onChange={e => setPhone(e.target.value)} />
 
           <div className="label">{t.birthDate}</div>
-          <input className="input" type="date" value={dob} max={new Date().toISOString().split('T')[0]} onChange={e => setDob(e.target.value)} />
+          <div style={{display:'flex',gap:8,marginBottom:16}}>
+            <input className="input" style={{margin:0,width:'30%',textAlign:'center'}} type="number" placeholder={lang==='he'?'יום':'Jour'} min={1} max={31} value={dobDay} onChange={e=>setDobDay(e.target.value)} />
+            <select className="select" style={{margin:0,width:'40%'}} value={dobMonth} onChange={e=>setDobMonth(e.target.value)}>
+              <option value="">{lang==='he'?'חודש':lang==='en'?'Month':'Mois'}</option>
+              {['01','02','03','04','05','06','07','08','09','10','11','12'].map((m,i)=>(
+                <option key={m} value={m}>{lang==='he'?['ינו','פבר','מרץ','אפר','מאי','יוני','יולי','אוג','ספט','אוק','נוב','דצמ'][i]:lang==='en'?['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][i]:['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Aoû','Sep','Oct','Nov','Déc'][i]}</option>
+              ))}
+            </select>
+            <input className="input" style={{margin:0,width:'30%',textAlign:'center'}} type="number" placeholder={lang==='he'?'שנה':'Année'} min={1920} max={new Date().getFullYear()} value={dobYear} onChange={e=>setDobYear(e.target.value)} />
+          </div>
 
           {currentAge !== null && currentAge >= 10 && (
             <div style={{ fontSize: 12, color: '#a855f7', fontWeight: 700, marginTop: -10, marginBottom: 16 }}>
