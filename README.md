@@ -1,18 +1,20 @@
-# Mazaly Digital — Site vitrine
+# Mazaly
 
-Site one-page de l'agence web **Mazaly Digital** (Tel Aviv). Interface principale en hébreu (RTL) avec une section dédiée à la communauté francophone (LTR). Construit avec **Next.js 14 (App Router)**, **TypeScript** et **Tailwind CSS**, sans dépendance UI lourde.
+Média communautaire francophone israélien. Marque mère pensée pour durer et évoluer (Mazaly Event, Mazaly Digital). Site public 100% français + dashboard d'administration.
 
 ## Stack
 
-- Next.js 14 (App Router) + TypeScript
-- Tailwind CSS
-- Resend pour le formulaire de contact
-- Composants maison (canvas étoilé, compteurs animés, fade-up au scroll)
+- **Next.js 14** (App Router) + TypeScript
+- **Supabase** : PostgreSQL, Auth, Storage
+- **TipTap** : éditeur de texte riche
+- **Tailwind CSS**
+- Déploiement **Vercel**
 
 ## Installation
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -20,51 +22,75 @@ Le site tourne sur http://localhost:3000
 
 ## Variables d'environnement
 
-Copier `.env.example` vers `.env.local` et renseigner :
-
 | Variable | Description |
 | --- | --- |
-| `RESEND_API_KEY` | Clé API Resend (obligatoire pour le formulaire) |
-| `CONTACT_TO_EMAIL` | Adresse de réception des messages (défaut : `hello@mazaly.digital`) |
-| `CONTACT_FROM_EMAIL` | Expéditeur vérifié chez Resend (défaut : `onboarding@resend.dev`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clé publique (anon) Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé service (réservée à d'éventuels scripts serveur) |
+| `NEXT_PUBLIC_SITE_URL` | URL publique du site (SEO / Open Graph) |
 
-> Sans `RESEND_API_KEY`, le reste du site fonctionne ; seul l'envoi du formulaire renvoie une erreur.
+> Sans configuration Supabase, le site public s'affiche avec des états vides ; l'admin redirige vers `/login`.
 
-## Déploiement Vercel
+## Configuration Supabase
 
-1. Pousser le repo sur GitHub.
-2. Sur [vercel.com](https://vercel.com), **New Project** → importer le repo.
-3. Framework détecté automatiquement : **Next.js** (aucune config requise).
-4. Ajouter les variables d'environnement (`RESEND_API_KEY`, etc.) dans **Settings → Environment Variables**.
-5. **Deploy**. Pour un domaine custom : **Settings → Domains**.
+1. Créer un projet sur [supabase.com](https://supabase.com).
+2. Dans **SQL Editor**, exécuter `supabase/schema.sql` (tables, RLS, fonctions, buckets Storage).
+3. Optionnel : exécuter `supabase/seed.sql` pour des catégories de départ.
+4. Récupérer l'URL et la clé anon dans **Project Settings → API** et les mettre dans `.env.local`.
 
-## Où changer le WhatsApp / l'email
+### Créer un compte rédacteur / admin
 
-Tout le contenu et les coordonnées sont centralisés dans **`lib/site.ts`** :
+Il n'y a pas d'inscription publique. Les comptes sont créés manuellement :
 
-```ts
-export const site = {
-  name: "Mazaly.Digital",
-  whatsapp: "972500000000",   // numéro WhatsApp (format international, sans +)
-  email: "hello@mazaly.digital"
-};
+1. **Authentication → Users → Add user** : créer l'utilisateur (email + mot de passe).
+2. Dans **SQL Editor**, insérer le profil avec le rôle voulu :
+
+```sql
+insert into profiles (id, nom, role)
+values ('<uuid-de-l-utilisateur>', 'Prénom Nom', 'admin');
 ```
 
-Le même fichier contient les services, le process, les projets, les compteurs et les points de la section française.
+Rôles disponibles : `lecteur`, `redacteur`, `admin`. L'accès à `/admin` est réservé à `redacteur` et `admin` ; seul `admin` peut changer les rôles.
 
 ## Structure
 
 ```
 app/
-  layout.tsx              Layout RTL (he) + polices Heebo & Inter
-  page.tsx                Composition de la page
-  globals.css             Tailwind + CSS custom (sélecteurs à classe unique)
-  api/contact/route.ts    Route d'envoi via Resend
-components/                Nav, Hero, Starfield, compteurs, sections, footer
-lib/site.ts               Configuration & contenu
-public/favicon.svg
+  (site)/                 Pages publiques (Navbar + Footer)
+    page.tsx              Homepage
+    news/                 Liste + article
+    blog/                 Liste + article
+    bonnes-adresses/      Liste + fiche
+    a-propos/
+  admin/                  Dashboard protégé (middleware + requireStaff)
+    articles/ adresses/ categories/ tags/ publicites/ newsletter/ utilisateurs/
+  login/                  Connexion Supabase Auth
+  api/newsletter/         Inscription newsletter
+components/               UI publique + composants admin (TipTap, uploads, formulaires)
+lib/
+  supabase/               Clients browser / server / middleware
+  queries.ts              Lecture publique
+  admin.ts                Lecture admin
+  auth.ts slug.ts upload.ts types.ts
+supabase/                 schema.sql + seed.sql
 ```
 
-## Accessibilité
+## Fonctionnalités
 
-Toutes les animations (canvas, cartes flottantes, compteurs, fade-up) respectent `prefers-reduced-motion`.
+- Articles News & Blog avec éditeur TipTap (gras, italique, H2/H3, listes, citation, liens, images inline)
+- Slug auto-généré (gestion des accents), unique
+- Upload d'images via Supabase Storage (buckets `articles`, `adresses`, `publicites`)
+- Compteur de vues (RPC `increment_article_vues`)
+- Bonnes adresses avec galerie et fiche détaillée
+- Publicités dynamiques par emplacement et dates actives
+- Newsletter (homepage + bas d'article) avec export CSV
+- SEO : meta title/description + Open Graph par page
+- Articles `draft` invisibles publiquement (RLS)
+- Responsive mobile first
+
+## Déploiement Vercel
+
+1. Pousser le repo sur GitHub.
+2. **New Project** sur [vercel.com](https://vercel.com), importer le repo (framework Next.js détecté).
+3. Ajouter les variables d'environnement.
+4. **Deploy**. Domaine custom via **Settings → Domains**.

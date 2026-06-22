@@ -1,30 +1,31 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "Mazaly Digital · בניית אתרים ופלטפורמות בתל אביב",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Mazaly — Le média de la communauté francophone en Israël",
+    template: "%s · Mazaly"
+  },
   description:
-    "סוכנות דיגיטל ישראלית בתל אביב. בונים אתרים ופלטפורמות מקצועיים תוך שבועיים — עברית, צרפתית ואנגלית.",
+    "Mazaly, le média communautaire des francophones en Israël : actualités, blog, bonnes adresses et vie de la communauté.",
   keywords: [
-    "בניית אתרים",
-    "סוכנות דיגיטל",
-    "תל אביב",
-    "פלטפורמה",
-    "Next.js",
-    "agence web Tel Aviv"
+    "francophones Israël",
+    "communauté française Israël",
+    "alyah",
+    "bonnes adresses Israël",
+    "actualité Israël"
   ],
   openGraph: {
-    title: "Mazaly Digital",
-    description: "סוכנות דיגיטל ישראלית — אתרים ופלטפורמות תוך שבועיים.",
-    locale: "he_IL",
-    type: "website"
+    type: "website",
+    locale: "fr_FR",
+    siteName: "Mazaly",
+    title: "Mazaly — Le média de la communauté francophone en Israël",
+    description:
+      "Actualités, blog et bonnes adresses pour les francophones d'Israël."
   }
-};
-
-export const viewport: Viewport = {
-  themeColor: "#060B1E",
-  width: "device-width",
-  initialScale: 1
 };
 
 export default function RootLayout({
@@ -33,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="fr">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -42,12 +43,12 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
-      <body className="page-bg">{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
