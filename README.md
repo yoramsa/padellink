@@ -10,7 +10,7 @@ carte-terrain signature où chaque place libre est un maillot en pointillés à 
 
 - **React 19 + Vite** (JSX, sans TypeScript)
 - **Tailwind CSS**
-- **Supabase** — Postgres + Auth (Google OAuth & lien magique) + Realtime + Storage (avatars)
+- **Supabase** — Postgres + Auth (Google OAuth & email/mot de passe) + Realtime + Storage (avatars)
 - Déployable sur **Vercel**
 
 ## Démarrage local
@@ -30,9 +30,12 @@ L'app tourne sur http://localhost:5173
 3. (Optionnel) Exécute `supabase/seed.sql` pour charger les données de démo
    (20 joueurs, 3 terrains à Tel-Aviv, 5 matchs, 1 ligue).
 4. **Authentication → Providers** :
-   - active **Email** (lien magique, activé par défaut),
+   - active **Email** (connexion par **email + mot de passe**),
    - active **Google** et renseigne le Client ID / Secret OAuth,
    - ajoute l'URL de ton app dans **Redirect URLs** (ex. `http://localhost:5173` et l'URL Vercel).
+   - Astuce : **Authentication → Providers → Email → « Confirm email »**. Si tu la **laisses activée**,
+     un nouvel utilisateur doit confirmer son email avant de pouvoir se connecter ; si tu la **désactives**,
+     la création de compte connecte immédiatement (pratique en dev).
 5. **Project Settings → API** : récupère `Project URL` et `anon public key`,
    place-les dans `.env` :
 

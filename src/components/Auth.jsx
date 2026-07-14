@@ -3,12 +3,18 @@ import { supabase } from '../supabase'
 import { Button, Input } from './ui'
 
 export default function Auth() {
+  const [mode, setMode] = useState('signin') // 'signin' | 'signup'
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [msg, setMsg] = useState(null)
   const [err, setErr] = useState(false)
-  const [cooldown, setCooldown] = useState(0)
+
+  function show(text, isErr) {
+    setMsg(text)
+    setErr(isErr)
+  }
 
   async function handleGoogle() {
     setGoogleLoading(true)
@@ -17,35 +23,50 @@ export default function Auth() {
       options: { redirectTo: window.location.origin },
     })
     if (error) {
-      setMsg(error.message)
-      setErr(true)
+      show(error.message, true)
       setGoogleLoading(false)
     }
   }
 
-  async function handleMagic() {
-    if (!email.includes('@') || !email.includes('.')) {
-      setMsg('Entre une adresse email valide.')
-      setErr(true)
-      return
-    }
-    if (cooldown > 0) return
-    setLoading(true)
+  async function handleSubmit() {
     setMsg(null)
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: window.location.origin },
+    if (!email.includes('@') || !email.includes('.')) return show('Entre une adresse email valide.', true)
+    if (password.length < 6) return show('Mot de passe : 6 caractères minimum.', true)
+
+    setLoading(true)
+    const creds = { email: email.trim().toLowerCase(), password }
+
+    if (mode === 'signup') {
+      const { data, error } = await supabase.auth.signUp({
+        ...creds,
+        options: { emailRedirectTo: window.location.origin },
+      })
+      setLoading(false)
+      if (error) return show(error.message, true)
+      // Si la confirmation email est activée dans Supabase, pas de session immédiate
+      if (data.session) {
+        show('Compte créé ⚽', false)
+      } else {
+        show('✉️ Compte créé ! Confirme ton email pour te connecter.', false)
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword(creds)
+      setLoading(false)
+      if (error) {
+        show(error.message.includes('Invalid') ? 'Email ou mot de passe incorrect.' : error.message, true)
+      }
+      // succès : onAuthStateChange bascule l'app automatiquement
+    }
+  }
+
+  async function handleForgot() {
+    if (!email.includes('@') || !email.includes('.')) return show("Entre d'abord ton email ci-dessus.", true)
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: window.location.origin,
     })
     setLoading(false)
-    if (error) {
-      setMsg(error.message)
-      setErr(true)
-    } else {
-      setMsg('✉️ Lien envoyé ! Vérifie ta boîte mail.')
-      setErr(false)
-      setCooldown(60)
-      const iv = setInterval(() => setCooldown((c) => (c <= 1 ? (clearInterval(iv), 0) : c - 1)), 1000)
-    }
+    show(error ? error.message : '✉️ Email de réinitialisation envoyé.', !!error)
   }
 
   return (
@@ -53,13 +74,34 @@ export default function Auth() {
       <div className="w-full max-w-[380px]">
         <div className="flex items-center gap-2 mb-1">
           <Logo />
-          <span className="font-display text-5xl tracking-wide text-chalk">SOCCER<span className="text-floodlight">LINK</span></span>
+          <span className="font-display text-5xl tracking-wide text-chalk">
+            SOCCER<span className="text-floodlight">LINK</span>
+          </span>
         </div>
         <p className="text-xs text-chalk/50 tracking-[0.2em] uppercase mb-10 ml-1">Le terrain, en poche · Israël</p>
 
         <div className="bg-grass rounded-3xl border border-grass-light/30 p-6 shadow-lift">
-          <h1 className="font-display text-2xl text-chalk tracking-wide mb-1">CONNEXION</h1>
-          <p className="text-xs text-chalk/50 mb-5">Rejoins la communauté football amateur.</p>
+          {/* Onglets connexion / création */}
+          <div className="flex bg-grass-deep/50 rounded-xl p-1 mb-5">
+            {[
+              { k: 'signin', l: 'Connexion' },
+              { k: 'signup', l: 'Créer un compte' },
+            ].map((t) => (
+              <button
+                key={t.k}
+                onClick={() => {
+                  setMode(t.k)
+                  setMsg(null)
+                }}
+                className={
+                  'flex-1 py-2 rounded-lg text-sm font-semibold transition ' +
+                  (mode === t.k ? 'bg-floodlight text-grass-deep' : 'text-chalk/60')
+                }
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
 
           <button
             onClick={handleGoogle}
@@ -81,17 +123,33 @@ export default function Auth() {
             <span className="flex-1 h-px bg-chalk/10" />
           </div>
 
-          <p className="text-xs text-chalk/50 mb-2.5">Reçois un lien magique — pas de mot de passe.</p>
           <Input
             type="email"
+            autoComplete="email"
             placeholder="email@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !cooldown && handleMagic()}
           />
-          <Button size="lg" className="mt-3" disabled={loading || !email || cooldown > 0} onClick={handleMagic}>
-            {loading ? 'Envoi…' : cooldown > 0 ? `Renvoyer (${cooldown}s)` : 'Envoyer le lien magique'}
+          <div className="mt-3">
+            <Input
+              type="password"
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              placeholder="Mot de passe"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            />
+          </div>
+
+          <Button size="lg" className="mt-3" disabled={loading || !email || !password} onClick={handleSubmit}>
+            {loading ? '…' : mode === 'signup' ? 'Créer mon compte' : 'Se connecter'}
           </Button>
+
+          {mode === 'signin' && (
+            <button onClick={handleForgot} disabled={loading} className="block w-full text-center text-xs text-chalk/45 mt-3 hover:text-chalk/70">
+              Mot de passe oublié ?
+            </button>
+          )}
 
           {msg && (
             <div
@@ -104,7 +162,9 @@ export default function Auth() {
             </div>
           )}
         </div>
-        <p className="text-center text-[11px] text-chalk/30 mt-6">Première connexion = création automatique du compte</p>
+        <p className="text-center text-[11px] text-chalk/30 mt-6">
+          {mode === 'signup' ? 'Un compte suffit pour rejoindre les matchs.' : 'Pas encore de compte ? Choisis « Créer un compte ».'}
+        </p>
       </div>
     </div>
   )
