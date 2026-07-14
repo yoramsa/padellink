@@ -1,21 +1,22 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from './supabase'
-import Auth from './Auth'
-import CreateProfile from './CreateProfile'
+import Auth from './components/Auth'
+import CreateProfile from './components/CreateProfile'
+import { ToastProvider } from './components/ui'
 
-const PadelLink = lazy(() => import('./PadelLink'))
-
+const SoccerLink = lazy(() => import('./SoccerLink'))
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function Loader() {
   return (
-    <div style={{
-      minHeight: '100vh', background: '#0e0e16', display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'Plus Jakarta Sans,sans-serif',
-      color: '#a855f7', fontSize: 18, fontWeight: 700, letterSpacing: 2
-    }}>
-      ⚡ PADELLINK...
+    <div className="min-h-[100dvh] bg-grass-deep mow-stripes flex flex-col items-center justify-center gap-3">
+      <svg width="46" height="46" viewBox="0 0 64 64" className="animate-pulse">
+        <rect x="6" y="6" width="52" height="52" rx="8" fill="#0F5136" stroke="#F4F7F0" strokeWidth="3" />
+        <line x1="6" y1="32" x2="58" y2="32" stroke="#F4F7F0" strokeWidth="3" />
+        <circle cx="32" cy="32" r="9" fill="none" stroke="#F4F7F0" strokeWidth="3" />
+        <circle cx="32" cy="32" r="4" fill="#FFC542" />
+      </svg>
+      <span className="font-display text-lg tracking-widest text-chalk/70">SOCCERLINK…</span>
     </div>
   )
 }
@@ -24,60 +25,60 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [pendingLeagueId, setPendingLeagueId] = useState(null)
-  const [pendingTournamentId, setPendingTournamentId] = useState(null)
-  const [lang, setLangState] = useState(() => localStorage.getItem('pl_lang') || 'en')
+  const [pendingMatchId, setPendingMatchId] = useState(null)
 
-  function setLang(l) { setLangState(l); localStorage.setItem('pl_lang', l) }
-
-  useEffect(function() {
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const leagueParam = params.get('league')
-    const tournamentParam = params.get('tournament')
-    if (leagueParam || tournamentParam) {
-      if (leagueParam && UUID_RE.test(leagueParam)) setPendingLeagueId(leagueParam)
-      if (tournamentParam && UUID_RE.test(tournamentParam)) setPendingTournamentId(tournamentParam)
+    const matchParam = params.get('match')
+    if (matchParam && UUID_RE.test(matchParam)) {
+      setPendingMatchId(matchParam)
       window.history.replaceState({}, '', window.location.pathname)
     }
 
-    supabase.auth.getSession().then(function(result) {
-      setSession(result.data.session)
-      if (result.data.session) loadPlayer(result.data.session.user.id)
-      else setLoading(false)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session)
+        if (data.session) loadPlayer(data.session.user.id)
+        else setLoading(false)
+      })
+      .catch(() => setLoading(false))
 
-    const listener = supabase.auth.onAuthStateChange(function(event, sess) {
+    const { data: listener } = supabase.auth.onAuthStateChange((_e, sess) => {
       setSession(sess)
       if (sess) loadPlayer(sess.user.id)
-      else { setPlayer(null); setLoading(false) }
+      else {
+        setPlayer(null)
+        setLoading(false)
+      }
     })
-
-    return function() { listener.data.subscription.unsubscribe() }
+    return () => listener.subscription.unsubscribe()
   }, [])
 
   async function loadPlayer(userId) {
     setLoading(true)
-    const { data } = await supabase.from('players').select('*').eq('user_id', userId).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     setPlayer(data || null)
     setLoading(false)
   }
 
   if (loading) return <Loader />
-  if (!session) return <Auth lang={lang} setLang={setLang} />
-  if (!player) return <CreateProfile session={session} onCreated={() => loadPlayer(session.user.id)} lang={lang} setLang={setLang} />
+  if (!session) return <ToastProvider><Auth /></ToastProvider>
+  if (!player)
+    return (
+      <ToastProvider>
+        <CreateProfile session={session} onCreated={() => loadPlayer(session.user.id)} />
+      </ToastProvider>
+    )
 
   return (
     <Suspense fallback={<Loader />}>
-      <PadelLink
+      <SoccerLink
         session={session}
         player={player}
-        pendingLeagueId={pendingLeagueId}
-        onClearPendingLeague={() => setPendingLeagueId(null)}
-        pendingTournamentId={pendingTournamentId}
-        onClearPendingTournament={() => setPendingTournamentId(null)}
+        pendingMatchId={pendingMatchId}
+        onClearPendingMatch={() => setPendingMatchId(null)}
         onSignOut={() => supabase.auth.signOut()}
-        lang={lang}
-        setLang={setLang}
       />
     </Suspense>
   )
