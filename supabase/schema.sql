@@ -141,6 +141,15 @@ create index if not exists idx_match_players_player on match_players (player_id)
 create index if not exists idx_ratings_rated on ratings (rated_id);
 create index if not exists idx_standings_league on league_standings (league_id);
 
+-- ── Droits d'accès (GRANT) pour l'API Supabase ──────────────
+-- Sans ces droits : "permission denied for table ...". La RLS ci-dessous
+-- reste la vraie barrière de sécurité au niveau ligne.
+grant usage on schema public to anon, authenticated;
+grant all on all tables in schema public to anon, authenticated;
+grant all on all sequences in schema public to anon, authenticated;
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
+
 -- ── RLS ─────────────────────────────────────────────────────
 alter table profiles         enable row level security;
 alter table venues           enable row level security;
