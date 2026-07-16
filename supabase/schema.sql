@@ -9,13 +9,27 @@
 -- ============================================================
 
 -- ── Reset ───────────────────────────────────────────────────
-drop table if exists league_standings cascade;
-drop table if exists ratings           cascade;
-drop table if exists match_players     cascade;
-drop table if exists matches           cascade;
-drop table if exists leagues           cascade;
-drop table if exists venues            cascade;
-drop table if exists profiles          cascade;
+-- Supprime chaque objet quel que soit son type (table / vue / vue matérialisée)
+do $$
+declare r record;
+begin
+  for r in
+    select c.relname, c.relkind
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname in ('league_standings','ratings','match_players','matches','leagues','venues','profiles')
+  loop
+    if r.relkind = 'v' then
+      execute format('drop view if exists public.%I cascade', r.relname);
+    elsif r.relkind = 'm' then
+      execute format('drop materialized view if exists public.%I cascade', r.relname);
+    else
+      execute format('drop table if exists public.%I cascade', r.relname);
+    end if;
+  end loop;
+end $$;
+
 drop policy if exists "avatars_read"   on storage.objects;
 drop policy if exists "avatars_write"  on storage.objects;
 drop policy if exists "avatars_update" on storage.objects;
