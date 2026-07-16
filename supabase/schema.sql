@@ -1,7 +1,24 @@
 -- ============================================================
 --  SoccerLink — schéma Postgres + RLS
 --  À exécuter dans Supabase → SQL Editor
+--
+--  Script rejouable : le bloc « reset » ci-dessous supprime les
+--  tables SoccerLink (et d'éventuelles tables homonymes d'une
+--  ancienne app) pour repartir propre. Ne pas lancer sur une base
+--  dont tu veux garder ces tables.
 -- ============================================================
+
+-- ── Reset ───────────────────────────────────────────────────
+drop table if exists league_standings cascade;
+drop table if exists ratings           cascade;
+drop table if exists match_players     cascade;
+drop table if exists matches           cascade;
+drop table if exists leagues           cascade;
+drop table if exists venues            cascade;
+drop table if exists profiles          cascade;
+drop policy if exists "avatars_read"   on storage.objects;
+drop policy if exists "avatars_write"  on storage.objects;
+drop policy if exists "avatars_update" on storage.objects;
 
 create extension if not exists pgcrypto;
 
